@@ -1,13 +1,17 @@
-import { useDashboardData } from '../hooks/useDashboardData'
+import { useState } from 'react'
+import type { useDashboardData } from '../hooks/useDashboardData'
 import { SummaryMetrics } from '../components/dashboard/SummaryMetrics'
 import { FailureDistribution } from '../components/dashboard/FailureDistribution'
 import { RecentIncidentsTable } from '../components/dashboard/RecentIncidentsTable'
 import { DataState, RefreshWarning } from '../components/shared/DataState'
 import { number, operatorTimeZone, timestamp } from '../utils/formatters'
 import styles from './DashboardPage.module.css'
+import { isAwaitingDecision } from '../utils/incidentPresentation'
 
-export function DashboardPage() {
-  const { summary, incidents, refresh, refreshing } = useDashboardData()
+export function DashboardPage({ dashboard, onIncidentOpen }: { dashboard: ReturnType<typeof useDashboardData>; onIncidentOpen: (id: string, element: HTMLElement) => void }) {
+  const { summary, incidents, refresh, refreshing } = dashboard
+  const [view, setView] = useState<'recent' | 'approval'>('recent')
+  const pendingCount = incidents.data?.incidents.filter(isAwaitingDecision).length ?? 0
   const bothLoaded = !!summary.data && !!incidents.data
   const hasError = !!summary.error || !!incidents.error
   const connection = refreshing ? 'Refreshing API data' : hasError ? 'API data incomplete' : bothLoaded ? 'API data loaded' : 'Waiting for API data'
@@ -25,8 +29,9 @@ export function DashboardPage() {
     </section>
     <div className={styles.grid}>
       <section className={styles.panel} aria-labelledby="recent-title" aria-busy={incidents.loading}>
-        <div className={styles.sectionHeading}><div><h2 id="recent-title">Recent incidents</h2><p>{incidents.data ? `Latest ${Math.min(10, incidents.data.incidents.length)} of ${number(incidents.data.incidents.length)} returned incidents` : 'Workflow failures reported to Panoptes'}</p></div><span className={styles.sectionLabel}>OCCURRED ↓</span></div>
-        {incidents.data ? <>{incidents.error && <RefreshWarning error={incidents.error} />}<RecentIncidentsTable incidents={incidents.data.incidents} /><p className={styles.freshness}>Fetched <time dateTime={incidents.fetchedAt ?? undefined}>{timestamp(incidents.fetchedAt, true)}</time></p></>
+        <div className={styles.sectionHeading}><div><h2 id="recent-title" tabIndex={-1}>{view === 'recent' ? 'Recent incidents' : 'Awaiting approval'}</h2><p>{incidents.data ? view === 'recent' ? `Latest ${Math.min(10, incidents.data.incidents.length)} of ${number(incidents.data.incidents.length)} returned incidents` : `${number(pendingCount)} pending decisions in returned incidents` : 'Workflow failures reported to Panoptes'}</p></div><span className={styles.sectionLabel}>OCCURRED ↓</span></div>
+        <div className={styles.viewToggle} role="group" aria-label="Incident table view"><button aria-pressed={view === 'recent'} onClick={() => setView('recent')}>Recent</button><button aria-pressed={view === 'approval'} onClick={() => setView('approval')}>Awaiting approval</button></div>
+        {incidents.data ? <>{incidents.error && <RefreshWarning error={incidents.error} />}<RecentIncidentsTable incidents={incidents.data.incidents} view={view} onIncidentOpen={onIncidentOpen} /><p className={styles.freshness}>Fetched <time dateTime={incidents.fetchedAt ?? undefined}>{timestamp(incidents.fetchedAt, true)}</time></p></>
           : <DataState kind={incidents.loading ? 'loading' : 'error'} title={incidents.loading ? 'Loading recent incidents' : 'Incidents unavailable'} message={incidents.error ?? 'Requesting workflow incidents from Panoptes.'} />}
       </section>
       <section className={`${styles.panel} ${styles.distribution}`} aria-labelledby="distribution-title" aria-busy={summary.loading}>

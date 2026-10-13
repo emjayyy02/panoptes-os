@@ -6,6 +6,10 @@
 .table td, .identity { padding: 16px; font-weight: 400; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .table tr:last-child td, .table tr:last-child th { border-bottom: 0; }
 .table tbody tr:hover { background: var(--surface-raised); }
+.table tbody tr { cursor: pointer; }
+.table tbody tr:focus-within { background: var(--surface-raised); }
+.incidentLink { display: block; color: var(--text); text-decoration: none; border-radius: 2px; }
+.incidentLink .id { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .identity { width: 28%; min-width: 256px; max-width: 320px; }
 .workflow { display: block; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
 .id { display: block; margin-top: 8px; color: var(--muted); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }

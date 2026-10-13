@@ -24,7 +24,7 @@ export interface SummaryResponse {
   failure_types: Record<string, number>
   generated_at: string
 }
-// Contract definitions only; M17.1 makes no detail or approval requests.
+// Detail fields and immutable event history are supplied by the backend.
 export interface IncidentDetail extends Incident {
   execution: Incident['execution'] & { error: { name: string | null; message: string | null } }
   recovery: Incident['recovery'] & { last_action: string | null; last_action_result: Record<string, unknown> | null }

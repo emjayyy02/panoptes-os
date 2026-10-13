@@ -1,4 +1,4 @@
-import type { Incident, IncidentsResponse, SummaryResponse } from '../types/panoptes'
+import type { ApprovalResponse, Incident, IncidentDetailResponse, IncidentEvent, IncidentsResponse, SummaryResponse } from '../types/panoptes'
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -31,4 +31,29 @@ export function isSummaryResponse(value: unknown): value is SummaryResponse {
     && ['incidents', 'escalated', 'recovered', 'recovery_pending', 'recovering', 'verifying', 'awaiting_approval', 'requiring_human'].every(key => count(totals[key]))
     && object(recovery) && count(recovery.total_retry_attempts)
     && object(failures) && Object.values(failures).every(count) && text(value.generated_at)
+}
+
+function isEvent(value: unknown): value is IncidentEvent {
+  return object(value) && texts(value, ['event_id', 'type', 'timestamp'])
+    && nullableTexts(value, ['message', 'old_status', 'new_status', 'tool_name'])
+    && (value.tool_result === null || object(value.tool_result))
+}
+
+export function isIncidentDetailResponse(value: unknown): value is IncidentDetailResponse {
+  if (!object(value) || value.success !== true || !isIncident(value.incident)) return false
+  const { execution, recovery } = value.incident
+  const incident = value.incident as unknown as Record<string, unknown>
+  const error = (execution as unknown as Record<string, unknown>).error
+  const config = incident.config
+  const recoveryDetail = recovery as unknown as Record<string, unknown>
+  return object(error) && nullableTexts(error, ['name', 'message'])
+    && nullableText(recoveryDetail.last_action)
+    && (recoveryDetail.last_action_result === null || object(recoveryDetail.last_action_result))
+    && object(config) && typeof config.auto_recovery_enabled === 'boolean' && typeof config.idempotency_guaranteed === 'boolean'
+    && Array.isArray(value.timeline) && value.timeline.every(isEvent)
+}
+
+export function isApprovalResponse(value: unknown): value is ApprovalResponse {
+  return object(value) && value.success === true && (value.action === 'APPROVE' || value.action === 'REJECT')
+    && texts(value, ['incident_id', 'operator', 'message', 'previous_status'])
 }
