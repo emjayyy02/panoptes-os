@@ -1,0 +1,9 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif; color: #e1e7ed; background: #0d1218;
+  --mono: 'Cascadia Code', Consolas, monospace;
+  --text: #e1e7ed; --muted: #9caaba; --accent: #a2c3e5;
+  --success: #88ceb0; --warning: #e8c17c; --danger: #f19d94;
+  --surface: #131b24; --surface-raised: #1b2632; --border: #293541; --border-strong: #536274;
+  color-scheme: dark; font-synthesis: none; text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}

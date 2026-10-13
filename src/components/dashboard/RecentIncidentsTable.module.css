@@ -1,0 +1,15 @@
+.hint { padding: 12px 24px; margin: 0; color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--border); }
+.scroll { overflow-x: auto; scrollbar-color: var(--border-strong) var(--surface); }
+.table { width: 100%; min-width: 960px; border-collapse: collapse; text-align: left; }
+.table thead th { font-weight: 500; font-size: 11px; color: var(--muted); background: var(--surface-raised); padding: 12px 16px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.table th:first-child, .table td:first-child { padding-left: 24px; }
+.table td, .identity { padding: 16px; font-weight: 400; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tr:last-child td, .table tr:last-child th { border-bottom: 0; }
+.table tbody tr:hover { background: var(--surface-raised); }
+.identity { width: 28%; min-width: 256px; max-width: 320px; }
+.workflow { display: block; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.id { display: block; margin-top: 8px; color: var(--muted); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
+.failure { font: 10px/1.5 var(--mono) !important; }
+.required { color: var(--warning); } .notRequired { color: var(--muted); }
+.time { min-width: 200px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.time > span { display: block; margin-top: 8px; color: var(--muted); font-size: 10px; }

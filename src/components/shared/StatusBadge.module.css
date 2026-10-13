@@ -1,0 +1,6 @@
+.badge { display: inline-block; max-width: 100%; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px; font: 10px/1.5 var(--mono); letter-spacing: .025em; overflow-wrap: anywhere; }
+.danger { color: var(--danger); background: #f19d9420; border-color: #f19d9430; }
+.warning { color: var(--warning); background: #e8c17c18; border-color: #e8c17c30; }
+.success { color: var(--success); background: #88ceb01a; border-color: #88ceb030; }
+.active { color: var(--accent); background: #a2c3e518; border-color: #a2c3e530; }
+.neutral { color: var(--muted); background: var(--surface-raised); border-color: var(--border); }
