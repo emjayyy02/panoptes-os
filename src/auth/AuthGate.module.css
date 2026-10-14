@@ -1,0 +1,13 @@
+.gate { max-width: 448px; margin: var(--space-5) auto; padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.gate h1 { margin: 0 0 var(--space-2); font-size: 24px; line-height: 1.3; }
+.gate p { color: var(--text-secondary); overflow-wrap: anywhere; }
+.form { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.form label { display: grid; gap: var(--space-2); color: var(--text-secondary); font-size: 14px; }
+.form input { width: 100%; min-width: 0; padding: var(--space-2) var(--space-3); background: var(--surface-inset); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 16px; }
+.gate button, .logout { min-height: 40px; padding: var(--space-2) var(--space-3); color: var(--text); background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; }
+.gate button + button { margin-left: var(--space-2); }
+.gate button:hover, .logout:hover { background: var(--surface-hover); }
+.gate button:disabled { opacity: .65; cursor: wait; }
+.operator { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); color: var(--text-secondary); font-size: 12px; }
+.identity { min-width: 0; overflow-wrap: anywhere; }
+.logout { margin-left: auto; flex-shrink: 0; }

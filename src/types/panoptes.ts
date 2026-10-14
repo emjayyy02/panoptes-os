@@ -36,7 +36,7 @@ export interface IncidentEvent {
 }
 export interface IncidentDetailResponse { success: true; incident: IncidentDetail; timeline: IncidentEvent[] }
 export type ApprovalDecision = 'APPROVE' | 'REJECT'
-export interface ApprovalRequest { incident_id: string; decision: ApprovalDecision; operator: 'operator_console' }
+export interface ApprovalRequest { incident_id: string; decision: ApprovalDecision }
 export interface ApprovalResponse {
   success: true; action: ApprovalDecision; incident_id: string; operator: string; message: string; previous_status: string
 }

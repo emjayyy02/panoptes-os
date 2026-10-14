@@ -1,4 +1,4 @@
-import type { ApprovalResponse, Incident, IncidentDetailResponse, IncidentEvent, IncidentsResponse, SummaryResponse } from '../types/panoptes'
+import type { ApprovalResponse, Incident, IncidentDetailResponse, IncidentEvent, IncidentsResponse, SummaryResponse } from '../types/panoptes.js'
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

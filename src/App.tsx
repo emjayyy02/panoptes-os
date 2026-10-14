@@ -11,8 +11,15 @@ import { useApprovalAction } from './hooks/useApprovalAction'
 import { isAwaitingDecision } from './utils/incidentPresentation'
 import type { ApprovalDecision } from './types/panoptes'
 import styles from './components/incidents/IncidentDetail.module.css'
+import { AuthGate } from './auth/AuthGate'
+import { useAuth } from './auth/authContext'
 
 export default function App() {
+  const { operator } = useAuth()
+  return <AuthGate><OperatorConsole key={operator} /></AuthGate>
+}
+
+function OperatorConsole() {
   const dashboard = useDashboardData()
   const selection = useIncidentSelection()
   const detail = useIncidentDetail(selection.id, selection.revision)
