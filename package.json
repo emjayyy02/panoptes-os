@@ -14,9 +14,10 @@
     "test:production": "node scripts/verify-production.mjs",
     "test:container": "node scripts/verify-container.mjs",
     "test:bundle": "node --import tsx scripts/verify-bundle.mjs",
-    "verify:local": "npm run lint && npm run build && npm run build:server && npm run test:gateway && npm run test:production && npm run test:container && npm run test:bundle",
+    "verify:local": "npm run lint && npm run build && npm run build:server && npm run test:gateway && npm run test:workflows && npm run test:production && npm run test:container && npm run test:bundle",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:workflows": "node --test scripts/verify-workflow-contracts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
