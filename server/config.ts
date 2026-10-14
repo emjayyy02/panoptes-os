@@ -36,12 +36,19 @@ function origin(value: string, name: string, development: boolean): string {
   } catch { throw new Error(`Invalid ${name}: require an HTTPS origin (loopback HTTP is allowed only in development).`) }
 }
 
+export function readGatewayPort(value: string | undefined): number {
+  const port = Number(value ?? '3001')
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PANOPTES_GATEWAY_PORT.')
+  return port
+}
+
 export function readConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const required = (name: string) => {
     const value = env[name]?.trim()
     if (!value) throw new Error(`Missing ${name}.`)
     return value
   }
+  if (env.NODE_ENV !== undefined && !['development', 'test', 'production'].includes(env.NODE_ENV)) throw new Error('Invalid NODE_ENV.')
   const development = env.NODE_ENV !== 'production'
   const supabaseKey = required('SUPABASE_PUBLISHABLE_KEY')
   validatePublicKey(supabaseKey)
@@ -54,8 +61,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     validateHeaderValue(approvalHeaderName, approvalHeaderValue)
     if (!approvalHeaderValue.trim() || /^(host|cookie|content-length|content-type|connection|transfer-encoding|upgrade|proxy-.*|sec-.*)$/i.test(approvalHeaderName)) throw new Error()
   } catch { throw new Error('Invalid server-only approval header configuration.') }
-  const port = Number(env.PANOPTES_GATEWAY_PORT ?? '3001')
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PANOPTES_GATEWAY_PORT.')
+  const port = readGatewayPort(env.PANOPTES_GATEWAY_PORT)
   return {
     supabaseUrl: origin(required('SUPABASE_URL'), 'SUPABASE_URL', development),
     supabaseKey, operatorIds,

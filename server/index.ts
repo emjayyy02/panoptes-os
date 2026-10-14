@@ -1,9 +1,12 @@
 import { readConfig } from './config.js'
 import { buildApp } from './app.js'
+import { registerFrontend } from './frontend.js'
+import { fileURLToPath } from 'node:url'
 
 try {
   const config = readConfig()
   const app = buildApp(config)
+  if (!config.development) await registerFrontend(app, fileURLToPath(new URL('../../dist/', import.meta.url)))
   const close = async () => { await app.close(); process.exit(0) }
   process.once('SIGINT', () => { void close() })
   process.once('SIGTERM', () => { void close() })

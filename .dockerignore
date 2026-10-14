@@ -1,0 +1,25 @@
+# Allowlist the complete build context; local configuration/evidence never enter it.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!tsconfig*.json
+!vite.config.ts
+!index.html
+!src/
+!src/**
+!server/
+!server/**
+!public/
+!public/**
+# Defense against accidentally placing private material inside an allowed tree.
+**/.*/**
+**/.*
+**/*.local
+**/*.map
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*backup*
+**/*export*

@@ -25,7 +25,7 @@ export function createTokenVerifier(config: GatewayConfig): VerifyToken {
     try {
       const { data, error } = await client.auth.getUser(token)
       if (signal.aborted) throw new AuthBoundaryError(503)
-      if (error) throw new AuthBoundaryError(error.status && error.status >= 400 && error.status < 500 ? 401 : 503)
+      if (error) throw new AuthBoundaryError(error.status && [400, 401, 403, 422].includes(error.status) ? 401 : 503)
       if (!data.user?.id || data.user.is_anonymous || !data.user.email) throw new AuthBoundaryError(401)
       return data.user.id
     } catch (error) {

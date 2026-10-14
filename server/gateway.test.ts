@@ -4,7 +4,7 @@ import { once } from 'node:events'
 import test from 'node:test'
 import { buildApp } from './app.js'
 import { AuthBoundaryError, createTokenVerifier } from './auth.js'
-import { readConfig, validatePublicKey } from './config.js'
+import { readConfig, readGatewayPort, validatePublicKey } from './config.js'
 import { forwardPanoptes } from './panoptes.js'
 import type { GatewayConfig } from './config.js'
 import type { Resource } from './panoptes.js'
@@ -25,13 +25,13 @@ const summary = { success: true, totals: { incidents: 0, escalated: 0, recovered
 const incident = {
   incident_id: 'INC-1-231', workflow: { id: '1', name: null }, execution: { id: '231', url: null, failed_node: null, mode: null, error: { name: null, message: null } },
   diagnosis: { failure_type: 'UNKNOWN', transience: 'UNKNOWN', retry_safety: 'UNKNOWN', side_effect_risk: 'UNKNOWN', summary: null, confidence: 0 },
-  recovery: { status: 'WAITING_FOR_APPROVAL', approval_status: 'PENDING', retry_count: 0, max_retries: 0, proposed_action: null, human_required: true, last_action: null, last_action_result: null },
+  recovery: { status: 'WAITING_FOR_APPROVAL', approval_status: 'PENDING', retry_count: 0, max_retries: 0, proposed_action: 'RETRY', human_required: true, last_action: null, last_action_result: null },
   timestamps: { occurred_at: '', created_at: '', updated_at: '', resolved_at: null }, config: { auto_recovery_enabled: false, idempotency_guaranteed: false },
 }
 const receipt = (decision = 'APPROVE') => ({ success: true, action: decision, incident_id: incident.incident_id, operator, message: 'Isolated decision accepted.', previous_status: 'WAITING_FOR_APPROVAL' })
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
-function harness(options: { status?: number; body?: unknown; fail?: boolean; production?: boolean } = {}) {
+function harness(options: { status?: number; body?: unknown; fail?: boolean; production?: boolean; postOnly?: boolean; preflightBody?: unknown } = {}) {
   const calls: { url: URL; init: RequestInit }[] = []
   let authCalls = 0
   const app = buildApp({ ...config, development: !options.production }, {
@@ -45,6 +45,7 @@ function harness(options: { status?: number; body?: unknown; fail?: boolean; pro
     upstreamFetch: async (input, init) => {
       const url = new URL(String(input))
       calls.push({ url, init: init! })
+      if (options.postOnly && init?.method === 'GET') return json(options.preflightBody ?? { success: true, incident, timeline: [] })
       if (options.fail) throw new Error(`Never disclose ${secret}`)
       const body = options.body ?? (url.pathname.endsWith('/summary') ? summary : url.pathname.endsWith('/incidents') ? { success: true, count: 0, incidents: [] } : url.pathname.endsWith('/incident') ? { success: true, incident, timeline: [] } : receipt(JSON.parse(String(init?.body)).decision))
       return json(body, options.status)
@@ -182,7 +183,11 @@ test('APPROVE and REJECT receive only trusted identity and internal Header Auth'
     assert.equal(call.init.redirect, 'error')
     assert.equal(response.body.includes(secret), false)
   }
-  assert.equal(h.calls.length, 2)
+  assert.equal(h.calls.length, 4)
+  for (const call of h.calls.filter(call => call.init.method === 'GET')) {
+    assert.equal(new Headers(call.init.headers).get(config.approvalHeaderName), null)
+    assert.equal(call.url.searchParams.get('incident_id'), incident.incident_id)
+  }
 })
 
 test('production upstream requests never include the ngrok development header', async t => {
@@ -192,18 +197,14 @@ test('production upstream requests never include the ngrok development header', 
 })
 
 test('upstream failures are controlled and never retried or confused with expired operator sessions', async t => {
-  for (const status of [301, 302, 401, 403, 500, 503]) {
-    const h = harness({ status, body: { message: secret, stack: 'private stack' } }); t.after(() => h.app.close())
+  for (const status of [301, 302, 400, 401, 403, 409, 422, 500, 503, 504]) {
+    const h = harness({ status, body: { message: secret, stack: 'private stack' }, postOnly: true }); t.after(() => h.app.close())
     const response = await h.app.inject({ method: 'POST', url: '/api/panoptes/approval', headers, payload: { incident_id: incident.incident_id, decision: 'APPROVE' } })
-    assert.equal(response.statusCode, 502)
+    assert.equal(response.statusCode, status === 409 ? 409 : status === 503 ? 503 : status === 504 ? 504 : 502)
     assert.equal(response.body.includes(secret), false)
     assert.equal(response.body.includes('private stack'), false)
     assert.equal(response.headers['set-cookie'], undefined)
-    assert.equal(h.calls.length, 1)
-  }
-  for (const status of [400, 409, 422]) {
-    const h = harness({ status }); t.after(() => h.app.close())
-    assert.equal((await h.app.inject({ method: 'POST', url: '/api/panoptes/approval', headers, payload: { incident_id: incident.incident_id, decision: 'REJECT' } })).statusCode, 409)
+    assert.equal(h.calls.length, 2)
   }
   const h = harness({ status: 404 }); t.after(() => h.app.close())
   assert.equal((await h.app.inject({ url: '/api/panoptes/incident?incident_id=INC-1-231', headers })).statusCode, 404)
@@ -211,12 +212,12 @@ test('upstream failures are controlled and never retried or confused with expire
 
 test('invalid contracts, mismatched receipts, and credential echoes fail closed', async t => {
   for (const body of [{ ...receipt(), operator: 'operator_console' }, { ...receipt(), incident_id: 'wrong' }, { ...receipt(), action: 'REJECT' }, { ...receipt(), message: secret }, { ...receipt(), message: token }, { success: false, message: secret }, { html: secret }]) {
-    const h = harness({ body }); t.after(() => h.app.close())
+    const h = harness({ body, postOnly: true }); t.after(() => h.app.close())
     const response = await h.app.inject({ method: 'POST', url: '/api/panoptes/approval', headers, payload: { incident_id: incident.incident_id, decision: 'APPROVE' } })
     assert.equal(response.statusCode, 502)
     assert.equal(response.body.includes(secret), false)
     assert.equal(response.body.includes(token), false)
-    assert.equal(h.calls.length, 1)
+    assert.equal(h.calls.length, 2)
   }
   const h = harness({ fail: true }); t.after(() => h.app.close())
   assert.equal((await h.app.inject({ url: '/api/panoptes/summary', headers })).statusCode, 502)
@@ -242,7 +243,7 @@ test('response projection and decoded credential checks prevent accidental upstr
   // A JSON Unicode escape must not bypass the check by hiding the raw secret bytes.
   const escaped = JSON.stringify({ ...receipt(), message: secret }).replace('canary', '\\u0063anary')
   await assert.rejects(() => forwardPanoptes(config, 'approval', operator, token, new AbortController().signal, undefined,
-    { incident_id: incident.incident_id, decision: 'APPROVE' }, async () => new Response(escaped)), error => error instanceof Error && 'status' in error && error.status === 502)
+    { incident_id: incident.incident_id, decision: 'APPROVE' }, async (_input, init) => init?.method === 'GET' ? json({ success: true, incident, timeline: [] }) : new Response(escaped)), error => error instanceof Error && 'status' in error && error.status === 502)
 })
 
 test('real Supabase SDK verifies against the configured Auth server on every request', async t => {
@@ -254,6 +255,7 @@ test('real Supabase SDK verifies against the configured Auth server on every req
     const value = req.headers.authorization
     res.setHeader('Content-Type', 'application/json')
     if (value === 'Bearer auth-outage') { res.statusCode = 503; res.end(JSON.stringify({ message: secret })); return }
+    if (value === 'Bearer rate-limited' || value === 'Bearer auth-timeout') { res.statusCode = value === 'Bearer rate-limited' ? 429 : 408; res.end(JSON.stringify({ message: secret })); return }
     if (value !== `Bearer ${token}` && value !== 'Bearer anonymous') { res.statusCode = 401; res.end(JSON.stringify({ message: secret })); return }
     res.end(JSON.stringify({ id: operator, email: 'operator@example.invalid', is_anonymous: value === 'Bearer anonymous', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, identities: [] }))
   })
@@ -268,5 +270,57 @@ test('real Supabase SDK verifies against the configured Auth server on every req
     await assert.rejects(() => verify(bad, new AbortController().signal), error => error instanceof AuthBoundaryError && error.status === 401 && !error.message.includes(secret))
   }
   await assert.rejects(() => verify('auth-outage', new AbortController().signal), error => error instanceof AuthBoundaryError && error.status === 503)
-  assert.equal(count, 7)
+  for (const value of ['rate-limited', 'auth-timeout']) await assert.rejects(() => verify(value, new AbortController().signal), error => error instanceof AuthBoundaryError && error.status === 503)
+  assert.equal(count, 9)
+})
+
+test('approval preflight rejects missing or stale details without forwarding a POST', async t => {
+  for (const preflightBody of [
+    { success: false, error: 'INCIDENT_NOT_FOUND' },
+    ...[{ status: 'ESCALATED' }, { approval_status: 'REJECTED' }, { proposed_action: null }].map(patch => ({ success: true, incident: { ...incident, recovery: { ...incident.recovery, ...patch } }, timeline: [] })),
+  ]) {
+    const h = harness({ postOnly: true, preflightBody }); t.after(() => h.app.close())
+    const response = await h.app.inject({ method: 'POST', url: '/api/panoptes/approval', headers, payload: { incident_id: incident.incident_id, decision: 'APPROVE' } })
+    assert.equal(response.statusCode, 'error' in preflightBody ? 404 : 409)
+    assert.equal(h.calls.length, 1)
+    assert.equal(h.calls[0].init.method, 'GET')
+  }
+})
+
+test('successful preflight does not guarantee approval: backend conflict and uncertain failure are preserved', async t => {
+  for (const status of [409, 500, 503, 504]) {
+    const h = harness({ postOnly: true, status }); t.after(() => h.app.close())
+    const response = await h.app.inject({ method: 'POST', url: '/api/panoptes/approval', headers, payload: { incident_id: incident.incident_id, decision: 'REJECT' } })
+    assert.equal(response.statusCode, status === 500 ? 502 : status)
+    assert.deepEqual(h.calls.map(call => call.init.method), ['GET', 'POST'])
+    assert.equal(h.calls[0].init.signal, h.calls[1].init.signal)
+  }
+})
+
+test('empty timeline and summary remain valid, but unexpected empty bodies do not imply not found', async t => {
+  const h = harness(); t.after(() => h.app.close())
+  assert.deepEqual((await h.app.inject({ url: '/api/panoptes/summary', headers })).json(), summary)
+  assert.deepEqual((await h.app.inject({ url: `/api/panoptes/incident?incident_id=${incident.incident_id}`, headers })).json().timeline, [])
+  for (const [body, status] of [['', 502], ['{broken', 502], [JSON.stringify({ success: false, error: 'INCIDENT_NOT_FOUND' }), 404]] as const) {
+    await assert.rejects(() => forwardPanoptes(config, 'incident', operator, token, new AbortController().signal, incident.incident_id, undefined,
+      async () => new Response(body)), error => error instanceof Error && 'status' in error && error.status === status)
+  }
+})
+
+test('recognized unavailable connections return 503 while other upstream failures remain 502', async () => {
+  for (const code of ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_SOCKET', 'UNKNOWN']) {
+    await assert.rejects(() => forwardPanoptes(config, 'summary', operator, token, new AbortController().signal, undefined, undefined,
+      async () => { throw new TypeError('fetch failed', { cause: { code } }) }), error => error instanceof Error && 'status' in error && error.status === (code === 'UNKNOWN' ? 502 : 503))
+  }
+  for (const code of ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']) {
+    await assert.rejects(() => forwardPanoptes(config, 'summary', operator, token, new AbortController().signal, undefined, undefined,
+      async () => { throw new TypeError('fetch failed', { cause: { code } }) }), error => error instanceof Error && 'status' in error && error.status === 504)
+  }
+})
+
+test('gateway port parser accepts the shared default/custom port and rejects invalid ports', () => {
+  assert.equal(readGatewayPort(undefined), 3001)
+  assert.equal(readGatewayPort('3301'), 3301)
+  assert.equal(readConfig({ ...environment, PANOPTES_GATEWAY_PORT: '3301' }).port, 3301)
+  for (const value of ['', '0', '65536', '1.5', 'NaN', 'host:3001']) assert.throws(() => readGatewayPort(value))
 })

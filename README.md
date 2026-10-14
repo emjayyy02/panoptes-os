@@ -1,6 +1,10 @@
 # Panoptes OS
 
-React/Vite/TypeScript operator console with a separate Node/TypeScript API gateway. M18.1 adds Supabase Auth and an application trust boundary while preserving the M17 dashboard, explorer, decision workflow, and System / Light / Dark themes.
+React/Vite/TypeScript operator console with a Node/TypeScript API gateway. M18.1 establishes Supabase Auth and the application trust boundary; M18.2 tightens reliability/configuration; M18.3 adds compiled production static serving and reproducible local production-mode verification while preserving the M17 interface.
+
+The production budget is strictly US$0/month. No hosted deployment, paid/trial-backed infrastructure, tunnel, or always-on public service is required. See [production configuration, local verification, ingress requirements, and limitations](docs/production.md). Hosted verification is not performed.
+
+The v1 freeze record is [docs/v1-freeze.md](docs/v1-freeze.md), with artifact hashes in [docs/v1-freeze.json](docs/v1-freeze.json).
 
 ## Local development
 
@@ -19,9 +23,9 @@ npm run dev:api
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The gateway defaults to loopback port 3001. Vite forwards `/api/panoptes` unchanged to that gateway and never calls n8n. If Vite's temporary config loader fails with EPERM on Windows, use `npm run dev -- --configLoader runner`.
+Open http://127.0.0.1:5173. The gateway defaults to loopback port 3001. Both Node and Vite validate `PANOPTES_GATEWAY_PORT`; restart both processes after changing it. Vite always targets `127.0.0.1` at that port, forwards `/api/panoptes` unchanged, and never calls n8n. Keep the development gateway bound to loopback. If Vite's temporary config loader fails with EPERM on Windows, use `npm run dev -- --configLoader runner`.
 
-For an existing M17 `.env.local`, copy the previous `PANOPTES_DEV_PROXY_TARGET` value to `PANOPTES_N8N_ORIGIN` and add the Auth settings and console origin. `PANOPTES_DEV_PROXY_TARGET` and `VITE_PANOPTES_API_BASE` are no longer read. There is no direct n8n proxy fallback.
+For an existing M17 setup, configure the server-only `PANOPTES_N8N_ORIGIN` and add the Auth settings and console origin. `PANOPTES_DEV_PROXY_TARGET` and `VITE_PANOPTES_API_BASE` are obsolete: neither is referenced by runtime code. Remove obsolete entries manually if present; M18.2 leaves the real ignored `.env.local` untouched. There is no direct n8n proxy fallback.
 
 ## Authentication and API boundary
 
@@ -33,9 +37,24 @@ The browser API base is fixed in code to `/api/panoptes`; environment variables 
 | `GET /api/panoptes/incidents` | `GET /webhook/panoptes/incidents` |
 | `GET /api/panoptes/incident?incident_id=...` | `GET /webhook/panoptes/incident?incident_id=...` |
 | `GET /api/panoptes/summary` | `GET /webhook/panoptes/summary` |
-| `POST /api/panoptes/approval` | `POST /webhook/panoptes/approval` |
+| `POST /api/panoptes/approval` | Advisory detail GET, then `POST /webhook/panoptes/approval` |
 
 Public approval JSON contains exactly `incident_id` and `decision` (`APPROVE` or `REJECT`). Extra fields, including `operator`, are rejected. The gateway constructs the internal JSON with `operator: verifiedUser.id` and injects the existing Header Auth credential only on this exact POST. Browser tokens, cookies, arbitrary headers, arbitrary routes, and upstream redirects are never forwarded. n8n remains authoritative for eligibility, recovery policy, and concurrent decisions. Successful responses retain the existing focused contract checks; errors are controlled and do not relay upstream credentials, bodies, or stack traces. Gateway responses use `Cache-Control: no-store`.
+
+Approval preflight rejects a missing incident or a detail that is no longer pending/has no proposed action. This GET grants no authorization and cannot guarantee that the subsequent POST succeeds. Human Approval revalidates its own conditions. Explicit backend HTTP 409 conflicts remain 409; an opaque failure after POST stays uncertain rather than being inferred from a later state read. The GET and POST share the gateway request deadline; neither is retried.
+
+| Status | Meaning |
+| --- | --- |
+| 400 | Invalid request, decision, query, incident ID, or JSON |
+| 401 / 403 | Invalid operator session / unauthorized operator or Origin |
+| 404 | Unknown route or incident (upstream 404 or explicit `INCIDENT_NOT_FOUND`) |
+| 409 | Advisory preflight state conflict or explicit backend approval conflict |
+| 413 / 415 | Oversized request / unsupported request media type |
+| 502 | Invalid/empty upstream response, credential failure, receipt mismatch, or unclassified upstream failure |
+| 503 | Upstream 503, recognized connection unavailability, or temporary Auth failure including rate limiting |
+| 504 | Upstream 504 or gateway deadline |
+
+Unexpected empty responses remain 502: an empty body alone cannot prove an incident is missing. Incident IDs remain bounded opaque strings, not UUID-only values. Temporary Auth failures do not invalidate the browser session. Missing required server configuration prevents startup.
 
 Sessions persist in **sessionStorage for the current tab**, with a separate SDK storage/BroadcastChannel key per tab. The SDK handles refresh; password fields clear on submit. Logout, terminal 401, denied operator access, or account changes remove protected content and invalidate in-flight reads. No approval POST is automatically retried. A failed acknowledgement remains uncertain and requires reading the backend state before another deliberate action.
 
@@ -54,16 +73,23 @@ npm run test:gateway
 npm run lint
 npm run build
 npm run build:server
+npm run test:production
+npm run test:container
+npm run test:bundle
 ```
 
-`build` produces frontend assets in `dist`; `build:server` produces independent server output in `.server`. `npm run start:api` runs the compiled server with environment variables supplied by the runtime. For a local compiled-server check, use `node --env-file=.env.local .server/server/index.js`. The server requires runtime configuration; the frontend uses only its public Auth configuration at build time.
+`build` produces frontend assets in `dist`; `build:server` produces independent server output in `.server`. `npm start` / `npm run start:api` run compiled JavaScript with configuration supplied by the runtime. With `NODE_ENV=production`, the same process serves the frontend and `/api/panoptes`; development continues to use Vite and the local gateway. Use `.env.production.example` as the placeholder production map. The real `.env.local` remains untouched. The frontend uses only its public Auth configuration at build time.
 
 Security tests use isolated Auth/upstream fixtures and synthetic credentials. They exercise the real Supabase server SDK, strict inputs, allowlist rejection, trusted identity/header injection, fixed routing, origin checks, bounded responses, upstream errors, and no POST retry. Local QA evidence under ignored `.qa/m18.1` separates real read-only browser verification from isolated action tests. Do not use live incidents for action tests without separately designated test incidents.
 
+M18.2 evidence is kept separately under ignored `.qa/m18.2`. Workflow patches change only Operator API's `Get Incident Events` and summary `Get many rows` to Always Output Data, and Error Intake's `Normalize Failure Event` timestamp guard. Empty read results reach the existing builders, producing a known missing-incident marker, `timeline: []`, or zero summary totals. Valid numeric timestamps are milliseconds (including zero); valid date strings normalize to UTC. Missing, empty, invalid, non-finite, or out-of-range timestamps use ingestion time without changing historical rows/events.
+
+Historical retry/budget combinations, timestamp ordering, and old row/event state differences remain evidence of earlier behavior. The current rejection mapping, retry budget/safety gates, immutable event writes, and lifecycle view are preserved. The catalog dependency audit is limited to the four named objects; it is not a blanket audit of unrelated RPCs or dynamic SQL.
+
 ## Production prerequisites
 
-M18.1 establishes the application boundary locally. A static frontend build and Vite preview do not include a proxy. A later deployment step must arrange HTTPS and same-origin routing of `/api/panoptes` to the Node gateway, supply server secrets at runtime, set `NODE_ENV=production`, and deploy only `dist` as public static assets. Production mode requires HTTPS origins and omits the ngrok development header. The gateway accepts only the configured console Origin when an Origin header is supplied; no cross-origin API access or wildcard CORS is enabled. Non-browser callers still require a valid bearer token and allowlisted ID.
+M18.3 verifies local production mode, not a hosted deployment. The compiled Fastify process publicly serves only verified `dist` assets; `.server` is executable private content. The current frontend uses `/` plus query parameters, so no broad SPA fallback exists. API misses/errors and private/source/map/traversal paths never become `index.html`. Startup refuses incomplete/unexpected build contents or symlinks. Production source maps are disabled. A future deployment still needs HTTPS termination, restricted HTTPS n8n ingress, runtime secrets, and `NODE_ENV=production`. Vite/preview are not the production server. The configured console Origin, per-request bearer verification and allowlist remain enforced for the API.
 
-Direct access to n8n operator webhook paths must be restricted by the later trusted network/ingress boundary. Gateway authentication does not secure a separately exposed n8n read webhook, and CORS is not that boundary. Existing Supabase `anon` / `authenticated` table grants and RLS also require a read-only audit before production, because browser Auth must not create a direct operational-data bypass. No Supabase schema, RLS policy, n8n workflow, hosting, tunnel, or ingress configuration is changed by this implementation.
+Direct access to n8n operator webhook paths must be restricted by the later trusted network/ingress boundary. Gateway authentication does not secure a separately exposed n8n read webhook, and CORS is not that boundary. The M18.2 user-executed catalog audit confirms revoked `anon` / `authenticated` privileges on the four Panoptes objects, RLS retained on tables, an invoker observability view, and retained `service_role` privileges. A real authenticated read-only application smoke passed after that grant change. Future objects/grants must preserve this boundary. No further schema or permission changes are part of this implementation.
 
-Hosting, ingress changes, deployed verification, M18.2 reliability work, and M18.3 remain outside this milestone. Existing `occurred_at` sorting, raw backend statuses/timestamps, stale-data handling for ordinary API failures, and approval reconciliation are preserved.
+M18.3 evidence under ignored `.qa/m18.3` uses isolated fixtures, the compiled production process, and local Docker. Real hosted HTTPS/ingress and hosted actions remain unverified. Optional separate Supabase Free provisioning is eligibility-gated and deferred; the current project, workflows, and operational data are unchanged. Existing sorting, backend statuses/timestamps, stale-data handling and approval reconciliation are preserved. No live approval/rejection action is used for verification. M19 and future feature work remain outside this freeze.

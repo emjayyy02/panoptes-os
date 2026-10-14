@@ -10,6 +10,15 @@ export class GatewayError extends Error {
 export type Resource = 'incidents' | 'incident' | 'summary' | 'approval'
 export type UpstreamFetch = typeof fetch
 
+const conflictMessage = 'Panoptes declined this decision. Refresh the incident before continuing.'
+const unavailableMessage = 'Panoptes is temporarily unavailable. Refresh to check the current state.'
+const timeoutMessage = 'Panoptes timed out. Refresh to check the current state; do not resubmit a decision automatically.'
+
+function networkFailureCode(error: unknown): unknown {
+  const cause = error instanceof Error ? error.cause : undefined
+  return typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : undefined
+}
+
 async function readJson(response: Response): Promise<unknown> {
   if (!response.body) throw new GatewayError(502, 'Panoptes returned an invalid response.')
   const reader = response.body.getReader()
@@ -51,6 +60,15 @@ const responseKeys = {
 
 export async function forwardPanoptes(config: GatewayConfig, resource: Resource, operator: string, token: string,
   signal: AbortSignal, incidentId?: string, approval?: ApprovalRequest, upstreamFetch: UpstreamFetch = fetch): Promise<unknown> {
+  if (resource === 'approval' && approval) {
+    // Advisory only: n8n revalidates state/eligibility and remains authoritative after this GET.
+    const detail = await forwardPanoptes(config, 'incident', operator, token, signal, approval.incident_id, undefined, upstreamFetch)
+    if (!isIncidentDetailResponse(detail)) throw new GatewayError(502, 'Panoptes returned an invalid response.')
+    const state = detail.incident.recovery
+    if (state.status !== 'WAITING_FOR_APPROVAL' || state.approval_status !== 'PENDING' || !state.proposed_action) {
+      throw new GatewayError(409, conflictMessage)
+    }
+  }
   const url = new URL(`/webhook/panoptes/${resource}`, config.n8nOrigin)
   if (resource === 'incident') url.searchParams.set('incident_id', incidentId!)
   const headers = new Headers({ Accept: 'application/json' })
@@ -68,13 +86,17 @@ export async function forwardPanoptes(config: GatewayConfig, resource: Resource,
     if (!response.ok) {
       await response.body?.cancel()
       if (response.status === 404 && resource === 'incident') throw new GatewayError(404, 'Incident not found.')
-      if (resource === 'approval' && [400, 409, 422].includes(response.status)) throw new GatewayError(409, 'Panoptes declined this decision. Refresh the incident before continuing.')
-      throw new GatewayError(502, 'Panoptes is temporarily unavailable. Refresh to check the current state.')
+      if (resource === 'approval' && response.status === 409) throw new GatewayError(409, conflictMessage)
+      if (response.status === 503) throw new GatewayError(503, unavailableMessage)
+      if (response.status === 504) throw new GatewayError(504, timeoutMessage)
+      throw new GatewayError(502, unavailableMessage)
     }
     const payload = await readJson(response)
     if (containsCredential(payload, [config.approvalHeaderValue, token])) throw new GatewayError(502, 'Panoptes returned an invalid response.')
     if (typeof payload === 'object' && payload !== null && 'success' in payload && payload.success === false) {
-      throw new GatewayError(resource === 'approval' ? 409 : 502, 'Panoptes could not complete this request. Refresh to check the current state.')
+      if (resource === 'incident' && 'error' in payload && payload.error === 'INCIDENT_NOT_FOUND') throw new GatewayError(404, 'Incident not found.')
+      // Unknown error payloads are not evidence that an approval had no side effects.
+      throw new GatewayError(502, 'Panoptes could not complete this request. Refresh to check the current state.')
     }
     const valid = resource === 'incidents' ? isIncidentsResponse(payload)
       : resource === 'summary' ? isSummaryResponse(payload)
@@ -85,7 +107,9 @@ export async function forwardPanoptes(config: GatewayConfig, resource: Resource,
     return Object.fromEntries(responseKeys[resource].map(key => [key, (payload as Record<string, unknown>)[key]]))
   } catch (error) {
     if (error instanceof GatewayError) throw error
-    if (signal.aborted) throw new GatewayError(504, 'Panoptes timed out. Refresh to check the current state; do not resubmit a decision automatically.')
-    throw new GatewayError(502, 'Panoptes is temporarily unavailable. Refresh to check the current state.')
+    const code = networkFailureCode(error)
+    if (signal.aborted || typeof code === 'string' && ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT'].includes(code)) throw new GatewayError(504, timeoutMessage)
+    if (typeof code === 'string' && ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_SOCKET'].includes(code)) throw new GatewayError(503, unavailableMessage)
+    throw new GatewayError(502, unavailableMessage)
   }
 }

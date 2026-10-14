@@ -1,0 +1,434 @@
+{
+  "status": "FROZEN",
+  "date": "2026-10-14",
+  "timezone": "Asia/Taipei",
+  "disclosure": "Panoptes OS v1 is deployment-ready and locally verified in production mode. Always-on public hosting is intentionally not maintained for this US$0/month portfolio project.",
+  "hostedVerification": "not performed",
+  "liveApprovalPosts": 0,
+  "checks": {
+    "lint": "PASS",
+    "frontendBuild": "PASS",
+    "serverBuild": "PASS",
+    "gatewayStaticTests": 24,
+    "productionBrowserAssertions": 170,
+    "containerChecks": 16,
+    "bundleFilesScanned": 8,
+    "secretEvidenceFilesScanned": 12,
+    "whitespace": "PASS"
+  },
+  "release": "Panoptes OS v1",
+  "evidence": "production-mode local verification; hosted verification not performed",
+  "gitBase": "3dda68acb27b58dd9171b644e18406a61826c367",
+  "sourceState": "Approved working tree; identified by hashes, not claimed to be a committed/deployed revision",
+  "node": "v24.19.0",
+  "dependencies": {
+    "fastify": "5.12.7",
+    "@supabase/supabase-js": "2.117.3",
+    "react": "19.3.0",
+    "vite": "8.3.4",
+    "typescript": "6.0.3",
+    "playwright": "1.62.1",
+    "tsx": "4.23.15"
+  },
+  "container": {
+    "imageId": "sha256:5b46801faa6dae5360f7a3729f091ec237ac38660960c01db59f90d0336f2905",
+    "baseImage": "node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
+    "node": "v24.21.0"
+  },
+  "n8n": {
+    "source": "Read-only inspection of existing local n8n container; not hosted verification",
+    "version": "2.36.9",
+    "imageId": "sha256:a9e2e3c8006ed453238266669ea1274be7136f515abe290a2f75a0ab9044c93d",
+    "workflowsModified": false,
+    "operationalDataModified": false
+  },
+  "workflows": [
+    {
+      "id": "2GuXhFFQfxmHyFyY",
+      "name": "[MAIN] Panoptes OS — Error Intake",
+      "activeVersionId": "e4e040f9-55dc-4108-b621-ee944a9f2a9f"
+    },
+    {
+      "id": "2mJsbncSfBM6Mjgt",
+      "name": "Panoptes OS — SW — Write Incident Event",
+      "activeVersionId": "5d978f0f-c499-4e82-9167-119554a26e07"
+    },
+    {
+      "id": "8IfFkal3PzDaKTkx",
+      "name": "Panoptes OS — Human Approval",
+      "activeVersionId": "b4750a8a-62d7-4c81-b282-1ffaf7571b25"
+    },
+    {
+      "id": "FJsoxA4y6sZk7t9E",
+      "name": "Panoptes OS — SW — Retry Execution",
+      "activeVersionId": "150eaf53-08d0-4fea-a2c0-c78272584039"
+    },
+    {
+      "id": "NTKpFxwqqVaGB6Jx",
+      "name": "Panoptes OS — SW — Verify Recovery",
+      "activeVersionId": "1c3c69bf-7a7a-4e40-b53b-6c5b408f38e2"
+    },
+    {
+      "id": "UZBtPJsnuuYcvaBi",
+      "name": "Panoptes OS — Sandbox — Failure Generator",
+      "activeVersionId": "01616a19-57b7-491a-9749-5d1af30a41c5"
+    },
+    {
+      "id": "c1f9la4KvD4bBs77",
+      "name": "Panoptes OS — SW — Collect Evidence",
+      "activeVersionId": "4d9e978b-4e67-4037-a17c-ed6df69584d4"
+    },
+    {
+      "id": "l8jF0NCDk6sw9qO4",
+      "name": "Panoptes OS — API — Operator Console",
+      "activeVersionId": "4d95a1de-a753-4c42-99f4-0d1772d0bc7f"
+    }
+  ],
+  "files": [
+    {
+      "file": ".dockerignore",
+      "sha256": "7a75e686d2bc18a8ab227921b5a3a4c5cd924480ef8aa021355678e0cbab073f"
+    },
+    {
+      "file": ".env.example",
+      "sha256": "9da654b6e31205e49d35528729f881c65b141074adb72292a6b695685aa08640"
+    },
+    {
+      "file": ".env.production.example",
+      "sha256": "710f55949d89e95a35acf86a9fd62bf0642f332291f90fa118c27e4d7b2e0119"
+    },
+    {
+      "file": ".gitignore",
+      "sha256": "f7e1d72b72403ca45807b410fecabe1cce2b3199c944e045268cd1cccfa79d4f"
+    },
+    {
+      "file": ".server/server/app.js",
+      "sha256": "e498fef291a389b2a6ba5964dd24948da82f5b431424cadf0f1d567041f50e3a"
+    },
+    {
+      "file": ".server/server/auth.js",
+      "sha256": "afb17d4ca52f28588d0e76ea639808312b7af27489ff17f34cce3f3d6403f585"
+    },
+    {
+      "file": ".server/server/config.js",
+      "sha256": "a637aba22391f5dfecb9b4d97bf2a014e61d16fc2d398fbda8eb6a86d9de542f"
+    },
+    {
+      "file": ".server/server/frontend.js",
+      "sha256": "e13cbabfaa4a9cefd8ab8a7e020a057bc2d9d725c27ce7c4a2db02d9c0a134c4"
+    },
+    {
+      "file": ".server/server/index.js",
+      "sha256": "9d3418606a7c09844d8eedefae4f4b21cf67d8618d2011f96cc8848f360f21eb"
+    },
+    {
+      "file": ".server/server/panoptes.js",
+      "sha256": "5f789c5934c4bdfdc3b3320de9ebaf431a8ef98423876153ff0fd6484e9303ff"
+    },
+    {
+      "file": ".server/src/services/panoptesContracts.js",
+      "sha256": "c98c74ee95812fa2e6b744da2c46c2a5982fe8812de6d43199b1d93b980e773f"
+    },
+    {
+      "file": ".server/src/types/panoptes.js",
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "file": "dist/assets/index-BMlpYQHz.css",
+      "sha256": "ce35235d1883adfd7ee06c92a087c4a32045fb0e178edd40b6474bfd5854ccd3"
+    },
+    {
+      "file": "dist/assets/index-BnFawVl0.js",
+      "sha256": "048fdefa90723524e4d73b4e517fd2fef128a22744591896704fc8a98383a401"
+    },
+    {
+      "file": "dist/index.html",
+      "sha256": "226af83f904642ae008d467fca08f3086c74b13c43d3b106b7e3c42ad35441a0"
+    },
+    {
+      "file": "dist/panoptes.svg",
+      "sha256": "b9efdc9fc0157a33eb2adb3bb31ca1c4c65bb497081f468cef9798cd018c5fe9"
+    },
+    {
+      "file": "Dockerfile",
+      "sha256": "2bd0eb0729b34e2d4ba1aea122b8fefb8bf3615937d650ee98da4091a493312d"
+    },
+    {
+      "file": "docs/production.md",
+      "sha256": "d0341369670ff2ea4e729ff3192ee847d7b18007349e2ed9346ae294a7593994"
+    },
+    {
+      "file": "index.html",
+      "sha256": "7b68d765905be0b25501c83b0d0e91a2f4b2cb508558074e2f308415ac9f2085"
+    },
+    {
+      "file": "package-lock.json",
+      "sha256": "8d2c2a67e52a23c1800a11cbbcfca6ca58bd0e2a951095dd7cd383db4cb38442"
+    },
+    {
+      "file": "package.json",
+      "sha256": "83779dfb55d80addaecaaa8f5f0d0b5ee5487efc56c3ed4b1ac86468bd94477e"
+    },
+    {
+      "file": "public/panoptes.svg",
+      "sha256": "b9efdc9fc0157a33eb2adb3bb31ca1c4c65bb497081f468cef9798cd018c5fe9"
+    },
+    {
+      "file": "README.md",
+      "sha256": "57ba57587da260d87df0ec021a2c2d003d0ef3d533621a9ae6008cd07cb26fd8"
+    },
+    {
+      "file": "scripts/fixtures.mjs",
+      "sha256": "84bf0fe6b7db8cf38a6529027555435a0f077e505465bad09fb7c45db8b77225"
+    },
+    {
+      "file": "scripts/record-artifacts.mjs",
+      "sha256": "333e13da8d71c033ab547a4d2ef90d735afd1564fb4633eb6c7e896180e44f9c"
+    },
+    {
+      "file": "scripts/verify-bundle.mjs",
+      "sha256": "5fce77732c5e1dd8e2068b4f90ed8a50dbce6b0aed2f526de9516d328f4b37d4"
+    },
+    {
+      "file": "scripts/verify-container.mjs",
+      "sha256": "bd760bb1eed45ac22acc866765c2486c8b35cd2adbd9310288b700a1aacebc6f"
+    },
+    {
+      "file": "scripts/verify-production.mjs",
+      "sha256": "274d55f99b2fa89e23a182081d765d26046d670d0a7d9b5bf741e63be8f9eb2e"
+    },
+    {
+      "file": "server/app.ts",
+      "sha256": "8856f5f1132e6bdd902388c16d7803a98f0571b323d161c8a7ca6f3e4c22e502"
+    },
+    {
+      "file": "server/auth.ts",
+      "sha256": "22893da204abf79aa4b951c257df67e118f1f720454809df237b149b4158e030"
+    },
+    {
+      "file": "server/config.ts",
+      "sha256": "023707fcbae12ab08e6bba71cd6ebd6b4803d15eac3447a3ce9ff82a56c76239"
+    },
+    {
+      "file": "server/frontend.test.ts",
+      "sha256": "69e3402b04f5624f8eb75b6cd5f0bcc10a3d259196af3f47d950a2021357bd16"
+    },
+    {
+      "file": "server/frontend.ts",
+      "sha256": "a6489d0c5aad9dbef5589e21c6996e06e90d4d44a99f63981a9fcfa9aaf3cecd"
+    },
+    {
+      "file": "server/gateway.test.ts",
+      "sha256": "d9fc8faa37d767124eed460fb7c9c038b63f9a91fb9dc8da142306d8fd2d6e6d"
+    },
+    {
+      "file": "server/index.ts",
+      "sha256": "ab5a04f669a723e3045b606c8086c97783f081e496744b93fc8ffb7162c9fc6d"
+    },
+    {
+      "file": "server/panoptes.ts",
+      "sha256": "23d4f188f9e64cded4bf550ea425504aa834c4bc1033d9f7c3cfc46ae489748a"
+    },
+    {
+      "file": "src/App.tsx",
+      "sha256": "d0850beddb060b42bc331bf5ffcb3fdf676590aa868fa9596343cf45c8f8a163"
+    },
+    {
+      "file": "src/auth/authContext.ts",
+      "sha256": "28556bce52740b655795ed33c0fa02df91b1e6c71260f18385d1d303fdc33edd"
+    },
+    {
+      "file": "src/auth/AuthGate.module.css",
+      "sha256": "5e01d0d84a899844c41e04978764f3680f2e5977f3172088e9c8f2b38321cdf1"
+    },
+    {
+      "file": "src/auth/AuthGate.tsx",
+      "sha256": "2001ab4a0e08f36c342530448e05258ec7b48af6511ed8eb3e0701ecf12f1058"
+    },
+    {
+      "file": "src/auth/AuthProvider.tsx",
+      "sha256": "79e5ccd091a67541f11d0ae8ea501040dca0aafb412adbdbe23e753ba6d4c78f"
+    },
+    {
+      "file": "src/components/dashboard/FailureDistribution.module.css",
+      "sha256": "62d485111dad66aba598890cea5f44c04275a6e47dddf028671a27c70d0967e1"
+    },
+    {
+      "file": "src/components/dashboard/FailureDistribution.tsx",
+      "sha256": "924dad590d6f1ac962372d8a173dbe7d1bdb44d1070408cf1ca9467d687872ac"
+    },
+    {
+      "file": "src/components/dashboard/RecentIncidentsTable.module.css",
+      "sha256": "9bcc0b41e8658b0747c3ef520f505e38c76da5f273b0629a8fe24304e441d61e"
+    },
+    {
+      "file": "src/components/dashboard/RecentIncidentsTable.tsx",
+      "sha256": "c304e35c3b06143e210dc98c46b08f1622c6fa8bc711f7b45a4eeb1a6aa3db14"
+    },
+    {
+      "file": "src/components/dashboard/SummaryMetrics.module.css",
+      "sha256": "fdba92bec6d010db23b1867088d2d5f378e4fe02cc48c7fb3778a13ade9232c2"
+    },
+    {
+      "file": "src/components/dashboard/SummaryMetrics.tsx",
+      "sha256": "63852de7a1eb50323e5e49784a6e94e30a67ca71c5336a8d7df9063465ab5ee6"
+    },
+    {
+      "file": "src/components/incidents/IncidentDetail.module.css",
+      "sha256": "1c993e3086b1042f1c9aa90eb4521fa45a346d1480916260c509ebc7734f9a9e"
+    },
+    {
+      "file": "src/components/incidents/IncidentDetailPanel.tsx",
+      "sha256": "a689bb1cd0e929c04568a0e06f7e86bc158f200a2f948671c2a7bf06bef63fa0"
+    },
+    {
+      "file": "src/components/incidents/IncidentEvidence.tsx",
+      "sha256": "4b89f74cf945363cc5e2e7e281987fd581c4345c1c65668d2bd4f6f00ea5dc2d"
+    },
+    {
+      "file": "src/components/incidents/IncidentTimeline.tsx",
+      "sha256": "72597976e911e8ec99fd22269c5c6e9c61c4217de6c60fb0b3b959acc7c7d4ad"
+    },
+    {
+      "file": "src/components/incidents/OperatorConfirmationDialog.tsx",
+      "sha256": "018c4381bf59f9ebfb3359a200e3d0f9093b0641c4b450ac563ac8a3a05f6861"
+    },
+    {
+      "file": "src/components/incidents/OperatorDecisionControls.tsx",
+      "sha256": "2e08fc23c2b26e0ea618f89e744bb2c07303a9258e2c98da3a6c6957132dd1b9"
+    },
+    {
+      "file": "src/components/incidents/RecoveryDetails.tsx",
+      "sha256": "cbb1d7d30e0dc786cb17c1eb65c806510a1ed7e6d8e6c173adc6924b5281cd00"
+    },
+    {
+      "file": "src/components/layout/ConsoleShell.module.css",
+      "sha256": "2d8629e8215f62c5b03150d59fe363cbbac92ef38dc429b7c9214c1558e25de4"
+    },
+    {
+      "file": "src/components/layout/ConsoleShell.tsx",
+      "sha256": "f7470a6010bb30687552f68ef29b8e731f293251e1bfc3270f049b015c57a96c"
+    },
+    {
+      "file": "src/components/layout/ThemeControl.module.css",
+      "sha256": "b1090106a13f23238a044f7e3f2870896317b5c9f15822f6a46d26124fb0e2b6"
+    },
+    {
+      "file": "src/components/layout/ThemeControl.tsx",
+      "sha256": "95ad5ae385980cb4aca80325a6d1051188ad1d800966cc0a5c12023c9d090e41"
+    },
+    {
+      "file": "src/components/shared/DataState.module.css",
+      "sha256": "8a90cca6750eb47b13772daa88b8d8af52e7531a6f19103ddbde3e0bf2c5c903"
+    },
+    {
+      "file": "src/components/shared/DataState.tsx",
+      "sha256": "cd94a8ed92e1c2f5676ce166497e09c5bb8b2cd82dc68848736657455af79395"
+    },
+    {
+      "file": "src/components/shared/StatusBadge.module.css",
+      "sha256": "7a095728fee7210a280332abc811518e515cc3b32bb0b1bbd00a5489312ab972"
+    },
+    {
+      "file": "src/components/shared/StatusBadge.tsx",
+      "sha256": "318ee25bd90c0eafc2f6326a3a0e7b0e2a998fd578d9c02419fe043a1e8e1375"
+    },
+    {
+      "file": "src/components/shared/UiIcon.tsx",
+      "sha256": "738129f5c5ea4d4d4f90f4a1e4b9d207b1b800d2cf293a49718acdaba9912c5c"
+    },
+    {
+      "file": "src/config/env.ts",
+      "sha256": "2f1e954a64cb9a9231a5b2f024f2dc52c74e18b11bf1021c164f4730ab0caa8e"
+    },
+    {
+      "file": "src/hooks/useApprovalAction.ts",
+      "sha256": "41ff5711e72a9687d1ab76e052b4489eb8bbb695d6d9c9009c24f00e234c80fc"
+    },
+    {
+      "file": "src/hooks/useDashboardData.ts",
+      "sha256": "84f6f27cc8c61ec85933466a2a68ebcf0165cac2daa016e7911ea25c9ee5be9b"
+    },
+    {
+      "file": "src/hooks/useIncidentDetail.ts",
+      "sha256": "5e65ad8103a9772c5e3173ef942cb32d7a6aebc33b146ceadb5211980045064b"
+    },
+    {
+      "file": "src/hooks/useIncidentSelection.ts",
+      "sha256": "dbc06fb79ba659f1e99399169e721b0b23cedeb35228ca6a4297e575f3355311"
+    },
+    {
+      "file": "src/hooks/useTheme.ts",
+      "sha256": "2a2e274202feb8401b7a5aeb073281d3c8b3f3724a47278af63c16c694647dfc"
+    },
+    {
+      "file": "src/main.tsx",
+      "sha256": "c7f8a29f1208eaaf5201ad10808087621fe4031180dfc4d1646342bfaa808569"
+    },
+    {
+      "file": "src/pages/DashboardPage.module.css",
+      "sha256": "24c1cab5403289f273a52bdb618c7a6a2301448da7dc5b01da18dd3afadbc7ff"
+    },
+    {
+      "file": "src/pages/DashboardPage.tsx",
+      "sha256": "4a3ecb5d4a5758a5c098096f362591fa1c2c80415b0f9b69a47bda07513bd4ae"
+    },
+    {
+      "file": "src/services/panoptesApi.ts",
+      "sha256": "3b94f70e6786d2c395dc06d4239bd062a1dbace98ab310301b0a0c4510fa3c2c"
+    },
+    {
+      "file": "src/services/panoptesContracts.ts",
+      "sha256": "68a70265d6e227401ef6360f2c02e75f64901be125fd6a86b07299a40288d62d"
+    },
+    {
+      "file": "src/services/supabaseAuth.ts",
+      "sha256": "e7511fe6fdc14f63bb3f382e9a2ae3a0ae898af218c8aead1086cfbf7de263b6"
+    },
+    {
+      "file": "src/styles/global.css",
+      "sha256": "7881c0ea1d9ed6d131b4fde46f58a004e72d59b462baed314438a8c64efdafc0"
+    },
+    {
+      "file": "src/styles/tokens.css",
+      "sha256": "bb2312fe0b156aec1eefe2f1e4377f55df7a9c72924904c8a9f36ac880225219"
+    },
+    {
+      "file": "src/types/panoptes.ts",
+      "sha256": "a72db23b1b8cf656d14a2a9c45d47857e36e8dd9a3ced7499e2111b1f626b533"
+    },
+    {
+      "file": "src/utils/formatters.ts",
+      "sha256": "677729faa4ef6fbb88486ceb2cae0e67ddbeb82075faa922fed3f9deb5e85f80"
+    },
+    {
+      "file": "src/utils/incidentPresentation.ts",
+      "sha256": "afbe790b422178dcef42510601ad4a8c06c76c8706c3cdb7a2ef9a34b11c9e47"
+    },
+    {
+      "file": "src/vite-env.d.ts",
+      "sha256": "8db2e50f7efd417c1ab037d1de22d691dc85817b9826731aeb90ac565786feca"
+    },
+    {
+      "file": "tsconfig.app.json",
+      "sha256": "1b246d31e9698193a0876e8c2522c7956253374b6be831ba24f42f5480711749"
+    },
+    {
+      "file": "tsconfig.json",
+      "sha256": "770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808"
+    },
+    {
+      "file": "tsconfig.node.json",
+      "sha256": "d366cc0827139db39c61815f22491bbfda56c654354a42ad7795143d314e45e8"
+    },
+    {
+      "file": "tsconfig.server.json",
+      "sha256": "5b17028b7ab5b3d81ce45f950bc834cc17e5df0967a7a5bdd4c4c32e0adfb388"
+    },
+    {
+      "file": "vite.config.ts",
+      "sha256": "a5157b30da220b3b6f38a80c642a93ebf7132cb84ba6f8a24c363a518233c194"
+    }
+  ],
+  "secretValuesRecorded": false
+}
