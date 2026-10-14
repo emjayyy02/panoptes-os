@@ -14,6 +14,59 @@ dist-ssr
 *.local
 .qa/
 
+# Local environment files; only the public placeholder maps are versioned.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Private keys, certificates and local database copies/dumps.
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+*.dump
+*.sql.gz
+*.sql.bak
+*.dump.sql
+*.backup.sql
+dump.sql
+backup.sql
+/database-dumps/
+/private-dumps/
+
+# Raw exports/backups belong here, never alongside curated public workflows.
+/workflow-backups/
+/workflow-exports-raw/
+/workflows/private/
+/workflows/raw/
+*workflow-backup*.json
+*workflow-export-raw*.json
+credentials-export*.json
+/backups/
+*.bak
+*.backup
+
+# Local runtime state and temporary artifacts.
+/runtime/
+/.runtime/
+/.n8n/
+/docker-data/
+/tmp/
+/temp/
+*.pid
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

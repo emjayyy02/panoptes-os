@@ -1,0 +1,284 @@
+{
+  "name": "Panoptes OS — SW — Write Incident Event",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "event_id"
+            },
+            {
+              "name": "incident_id"
+            },
+            {
+              "name": "event_type"
+            },
+            {
+              "name": "event_message"
+            },
+            {
+              "name": "old_status"
+            },
+            {
+              "name": "new_status"
+            },
+            {
+              "name": "tool_name"
+            },
+            {
+              "name": "tool_result",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "a28e57dc-8af2-426a-bedc-40050f5c3879",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Event Payload — Panoptes M11.3\n\nconst input = $input.first().json;\n\nif (!input.event_id) {\n  throw new Error('Panoptes event missing event_id');\n}\n\nif (!input.incident_id) {\n  throw new Error('Panoptes event missing incident_id');\n}\n\nif (!input.event_type) {\n  throw new Error('Panoptes event missing event_type');\n}\n\nif (\n  typeof input.event_message !== 'string' ||\n  input.event_message.trim().length === 0\n) {\n  throw new Error('Panoptes event missing event_message');\n}\n\nreturn [{\n  json: {\n    event_id: String(input.event_id),\n    incident_id: String(input.incident_id),\n    event_type: String(input.event_type),\n\n    event_message: input.event_message,\n\n    old_status: input.old_status ?? null,\n    new_status: input.new_status ?? null,\n\n    tool_name: input.tool_name ?? null,\n    tool_result: input.tool_result ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a94aaddf-0abd-4ac4-acb3-fc0cd9f10577",
+      "name": "Validate Event Payload"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "panoptes_incident_events",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "keyValue": "={{ $json.event_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        272,
+        0
+      ],
+      "id": "08396f6a-3764-4e50-86d9-5a400f265f60",
+      "name": "Get Existing Event",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "802a8de8-99d8-4616-9a9a-05ab82003eb7",
+              "leftValue": "={{ Boolean($json.event_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        0
+      ],
+      "id": "2d5fbc83-b4bf-4f2d-bcb6-7d6017f0cbd1",
+      "name": "Event Already Exists?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return Duplicate Result — Panoptes M11.3\n\nconst event = $('Validate Event Payload').first().json;\n\nreturn [{\n  json: {\n    event_id: event.event_id,\n    incident_id: event.incident_id,\n\n    event_written: false,\n    duplicate: true,\n\n    result: 'EVENT_ALREADY_EXISTS'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -96
+      ],
+      "id": "4e416122-3036-40df-9aee-56502767ce9d",
+      "name": "Return Duplicate Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Restore Event Payload — Panoptes M11.3\n\nconst event = $('Validate Event Payload').first().json;\n\nreturn [{\n  json: event\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        96
+      ],
+      "id": "ccf35436-0180-4dde-9b7f-04a29aad1613",
+      "name": "Restore Event Payload"
+    },
+    {
+      "parameters": {
+        "tableId": "panoptes_incident_events",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "event_id",
+              "fieldValue": "={{ $json.event_id }}"
+            },
+            {
+              "fieldId": "incident_id",
+              "fieldValue": "={{ $json.incident_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "={{ $json.event_type }}"
+            },
+            {
+              "fieldId": "event_message",
+              "fieldValue": "={{ $json.event_message }}"
+            },
+            {
+              "fieldId": "old_status",
+              "fieldValue": "={{ $json.old_status }}"
+            },
+            {
+              "fieldId": "new_status",
+              "fieldValue": "={{ $json.new_status }}"
+            },
+            {
+              "fieldId": "tool_name",
+              "fieldValue": "={{ $json.tool_name }}"
+            },
+            {
+              "fieldId": "tool_result",
+              "fieldValue": "={{ $json.tool_result }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        992,
+        96
+      ],
+      "id": "981fcbb6-cff4-473d-a505-6c3ca7543dda",
+      "name": "Create Incident Event"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return Created Result — Panoptes M11.3\n\nconst event = $('Restore Event Payload').first().json;\n\nreturn [{\n  json: {\n    event_id: event.event_id,\n    incident_id: event.incident_id,\n\n    event_written: true,\n    duplicate: false,\n\n    result: 'EVENT_CREATED'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        96
+      ],
+      "id": "5e849d6a-ddf8-485b-8e4e-f2663e65c3cb",
+      "name": "Return Created Result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Event Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Event Payload": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Event": {
+      "main": [
+        [
+          {
+            "node": "Event Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Return Duplicate Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore Event Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Event Payload": {
+      "main": [
+        [
+          {
+            "node": "Create Incident Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Incident Event": {
+      "main": [
+        [
+          {
+            "node": "Return Created Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

@@ -19,7 +19,7 @@
   "release": "Panoptes OS v1",
   "evidence": "production-mode local verification; hosted verification not performed",
   "gitBase": "3dda68acb27b58dd9171b644e18406a61826c367",
-  "sourceState": "Approved working tree; identified by hashes, not claimed to be a committed/deployed revision",
+  "sourceState": "Historical M18.3 frozen application source snapshot; documentation and public packaging sanitized in M19.1. Source hashes below refer to the original freeze, not a hosted deployment.",
   "node": "v24.19.0",
   "dependencies": {
     "fastify": "5.12.7",
@@ -31,57 +31,47 @@
     "tsx": "4.23.15"
   },
   "container": {
-    "imageId": "sha256:5b46801faa6dae5360f7a3729f091ec237ac38660960c01db59f90d0336f2905",
     "baseImage": "node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
     "node": "v24.21.0"
   },
   "n8n": {
     "source": "Read-only inspection of existing local n8n container; not hosted verification",
     "version": "2.36.9",
-    "imageId": "sha256:a9e2e3c8006ed453238266669ea1274be7136f515abe290a2f75a0ab9044c93d",
     "workflowsModified": false,
     "operationalDataModified": false
   },
   "workflows": [
     {
-      "id": "2GuXhFFQfxmHyFyY",
       "name": "[MAIN] Panoptes OS — Error Intake",
-      "activeVersionId": "e4e040f9-55dc-4108-b621-ee944a9f2a9f"
+      "file": "workflows/error-intake.json"
     },
     {
-      "id": "2mJsbncSfBM6Mjgt",
-      "name": "Panoptes OS — SW — Write Incident Event",
-      "activeVersionId": "5d978f0f-c499-4e82-9167-119554a26e07"
-    },
-    {
-      "id": "8IfFkal3PzDaKTkx",
-      "name": "Panoptes OS — Human Approval",
-      "activeVersionId": "b4750a8a-62d7-4c81-b282-1ffaf7571b25"
-    },
-    {
-      "id": "FJsoxA4y6sZk7t9E",
-      "name": "Panoptes OS — SW — Retry Execution",
-      "activeVersionId": "150eaf53-08d0-4fea-a2c0-c78272584039"
-    },
-    {
-      "id": "NTKpFxwqqVaGB6Jx",
-      "name": "Panoptes OS — SW — Verify Recovery",
-      "activeVersionId": "1c3c69bf-7a7a-4e40-b53b-6c5b408f38e2"
-    },
-    {
-      "id": "UZBtPJsnuuYcvaBi",
       "name": "Panoptes OS — Sandbox — Failure Generator",
-      "activeVersionId": "01616a19-57b7-491a-9749-5d1af30a41c5"
+      "file": "workflows/sandbox-failure-generator.json"
     },
     {
-      "id": "c1f9la4KvD4bBs77",
       "name": "Panoptes OS — SW — Collect Evidence",
-      "activeVersionId": "4d9e978b-4e67-4037-a17c-ed6df69584d4"
+      "file": "workflows/collect-evidence.json"
     },
     {
-      "id": "l8jF0NCDk6sw9qO4",
+      "name": "Panoptes OS — SW — Retry Execution",
+      "file": "workflows/retry-execution.json"
+    },
+    {
+      "name": "Panoptes OS — SW — Verify Recovery",
+      "file": "workflows/verify-recovery.json"
+    },
+    {
+      "name": "Panoptes OS — Human Approval",
+      "file": "workflows/human-approval.json"
+    },
+    {
+      "name": "Panoptes OS — SW — Write Incident Event",
+      "file": "workflows/write-incident-event.json"
+    },
+    {
       "name": "Panoptes OS — API — Operator Console",
-      "activeVersionId": "4d95a1de-a753-4c42-99f4-0d1772d0bc7f"
+      "file": "workflows/operator-console-api.json"
     }
   ],
   "files": [
@@ -98,64 +88,8 @@
       "sha256": "710f55949d89e95a35acf86a9fd62bf0642f332291f90fa118c27e4d7b2e0119"
     },
     {
-      "file": ".gitignore",
-      "sha256": "f7e1d72b72403ca45807b410fecabe1cce2b3199c944e045268cd1cccfa79d4f"
-    },
-    {
-      "file": ".server/server/app.js",
-      "sha256": "e498fef291a389b2a6ba5964dd24948da82f5b431424cadf0f1d567041f50e3a"
-    },
-    {
-      "file": ".server/server/auth.js",
-      "sha256": "afb17d4ca52f28588d0e76ea639808312b7af27489ff17f34cce3f3d6403f585"
-    },
-    {
-      "file": ".server/server/config.js",
-      "sha256": "a637aba22391f5dfecb9b4d97bf2a014e61d16fc2d398fbda8eb6a86d9de542f"
-    },
-    {
-      "file": ".server/server/frontend.js",
-      "sha256": "e13cbabfaa4a9cefd8ab8a7e020a057bc2d9d725c27ce7c4a2db02d9c0a134c4"
-    },
-    {
-      "file": ".server/server/index.js",
-      "sha256": "9d3418606a7c09844d8eedefae4f4b21cf67d8618d2011f96cc8848f360f21eb"
-    },
-    {
-      "file": ".server/server/panoptes.js",
-      "sha256": "5f789c5934c4bdfdc3b3320de9ebaf431a8ef98423876153ff0fd6484e9303ff"
-    },
-    {
-      "file": ".server/src/services/panoptesContracts.js",
-      "sha256": "c98c74ee95812fa2e6b744da2c46c2a5982fe8812de6d43199b1d93b980e773f"
-    },
-    {
-      "file": ".server/src/types/panoptes.js",
-      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
-    },
-    {
-      "file": "dist/assets/index-BMlpYQHz.css",
-      "sha256": "ce35235d1883adfd7ee06c92a087c4a32045fb0e178edd40b6474bfd5854ccd3"
-    },
-    {
-      "file": "dist/assets/index-BnFawVl0.js",
-      "sha256": "048fdefa90723524e4d73b4e517fd2fef128a22744591896704fc8a98383a401"
-    },
-    {
-      "file": "dist/index.html",
-      "sha256": "226af83f904642ae008d467fca08f3086c74b13c43d3b106b7e3c42ad35441a0"
-    },
-    {
-      "file": "dist/panoptes.svg",
-      "sha256": "b9efdc9fc0157a33eb2adb3bb31ca1c4c65bb497081f468cef9798cd018c5fe9"
-    },
-    {
       "file": "Dockerfile",
       "sha256": "2bd0eb0729b34e2d4ba1aea122b8fefb8bf3615937d650ee98da4091a493312d"
-    },
-    {
-      "file": "docs/production.md",
-      "sha256": "d0341369670ff2ea4e729ff3192ee847d7b18007349e2ed9346ae294a7593994"
     },
     {
       "file": "index.html",
@@ -172,10 +106,6 @@
     {
       "file": "public/panoptes.svg",
       "sha256": "b9efdc9fc0157a33eb2adb3bb31ca1c4c65bb497081f468cef9798cd018c5fe9"
-    },
-    {
-      "file": "README.md",
-      "sha256": "57ba57587da260d87df0ec021a2c2d003d0ef3d533621a9ae6008cd07cb26fd8"
     },
     {
       "file": "scripts/fixtures.mjs",
@@ -430,5 +360,11 @@
       "sha256": "a5157b30da220b3b6f38a80c642a93ebf7132cb84ba6f8a24c363a518233c194"
     }
   ],
-  "secretValuesRecorded": false
+  "secretValuesRecorded": false,
+  "publicSanitization": {
+    "milestone": "M19.1",
+    "originalEvidence": "Preserved in ignored local QA evidence",
+    "removed": "Local workflow/version IDs and container image identities; generated outputs and mutable documentation hashes omitted",
+    "historyRewritten": false
+  }
 }

@@ -1,0 +1,2892 @@
+{
+  "name": "Panoptes OS — Human Approval",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "panoptes/approval",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -592,
+        0
+      ],
+      "id": "96bff73b-ae74-4433-a71b-09c983dfa52e",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Approval Request — Panoptes M10\n\nconst body = $input.first().json.body ?? $input.first().json;\n\nconst incidentId = body.incident_id ?? null;\nconst decision =\n  typeof body.decision === 'string'\n    ? body.decision.toUpperCase()\n    : null;\n\nconst operator = body.operator ?? 'unknown';\n\nif (!incidentId) {\n  throw new Error('Human approval request missing incident_id');\n}\n\nif (!['APPROVE', 'REJECT'].includes(decision)) {\n  throw new Error(\n    'Human approval decision must be APPROVE or REJECT'\n  );\n}\n\nreturn [{\n  json: {\n    incident_id: String(incidentId),\n    decision,\n    operator: String(operator),\n    decided_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        0
+      ],
+      "id": "0c8fa6bc-2d70-4801-b6eb-c07e495a91eb",
+      "name": "Validate Approval Request"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "f73fa4f4-d183-437b-8d3d-6d9a876dda33",
+      "name": "Get Incident",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Pending Approval — Panoptes M10\n\nconst incident = $input.first().json;\nconst request = $('Validate Approval Request').first().json;\n\nif (!incident.incident_id) {\n  throw new Error('Panoptes approval incident not found');\n}\n\nif (incident.status !== 'WAITING_FOR_APPROVAL') {\n  throw new Error(\n    `Incident is not waiting for approval. Current status: ${incident.status}`\n  );\n}\n\nif (incident.approval_status !== 'PENDING') {\n  throw new Error(\n    `Incident approval is not pending. Current approval_status: ${incident.approval_status}`\n  );\n}\n\nif (!incident.proposed_action) {\n  throw new Error(\n    'Pending approval incident has no proposed_action'\n  );\n}\n\nreturn [{\n  json: {\n    incident_id: incident.incident_id,\n\n    decision: request.decision,\n    operator: request.operator,\n    decided_at: request.decided_at,\n\n    proposed_action: incident.proposed_action,\n\n    execution_id: incident.execution_id,\n    retry_count: incident.retry_count,\n    max_retries: incident.max_retries,\n\n    current_status: incident.status,\n    current_approval_status: incident.approval_status\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        0
+      ],
+      "id": "67e6a5a7-5208-4c2d-9c4c-5c22459c50e4",
+      "name": "Validate Pending Approval"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "APPROVE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "b226196d-3cd1-4f98-a8ee-dcbaff9daf03"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "APPROVE"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6de7dd75-ad2e-4d8b-ba2b-e400c4b30ba3",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "REJECT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "REJECT"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        0
+      ],
+      "id": "31ad9c9d-0ced-42fd-994f-4d464ae2e72b",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Approval Granted Update — Panoptes M10\n\nconst input = $input.first().json;\n\nif (!input.incident_id) {\n  throw new Error('Approved recovery missing incident_id');\n}\n\nif (input.decision !== 'APPROVE') {\n  throw new Error('Approval branch received non-APPROVE decision');\n}\n\nif (input.proposed_action !== 'RETRY') {\n  throw new Error(\n    `Unsupported approved action: ${input.proposed_action}`\n  );\n}\n\nreturn [{\n  json: {\n    incident_id: input.incident_id,\n\n    execution_id: input.execution_id,\n    retry_count: input.retry_count,\n    max_retries: input.max_retries,\n\n    status: 'RECOVERING',\n    human_required: false,\n\n    proposed_action: 'RETRY',\n    approval_status: 'APPROVED',\n\n    operator: input.operator,\n    decided_at: input.decided_at,\n\n    last_action: 'human_approval_granted',\n\n    last_action_result: {\n      success: true,\n      decision: 'APPROVE',\n      operator: input.operator,\n      approved_action: 'RETRY'\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        -96
+      ],
+      "id": "427aaafa-d9d2-42a7-a6b2-320121045be7",
+      "name": "Build Approval Granted Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build APPROVAL_GRANTED Event — Panoptes M10\n\nconst update = $('Build Approval Granted Update').first().json;\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-APPROVAL-GRANTED`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'APPROVAL_GRANTED',\n\n    event_message:\n      `Human operator ${update.operator} approved recovery action ${update.proposed_action}.`,\n\n    old_status: 'WAITING_FOR_APPROVAL',\n    new_status: 'RECOVERING',\n\n    tool_name: null,\n\n    tool_result: {\n      decision: 'APPROVE',\n      operator: update.operator,\n      approved_action: update.proposed_action,\n      decided_at: update.decided_at\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "d404cd10-6a09-4548-b1f7-f9400b99e777",
+      "name": "Build APPROVAL_GRANTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_RETRY_EXECUTION",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "retry_count": "={{ $('Build Approval Granted Update').first().json.retry_count }}",
+            "max_retries": "={{ $('Build Approval Granted Update').first().json.max_retries }}",
+            "incident_id": "={{ $('Build Approval Granted Update').first().json.incident_id }}",
+            "execution_id": "={{ $('Build Approval Granted Update').first().json.execution_id }}",
+            "retry_safety": "={{ $('Get Incident').first().json.retry_safety }}",
+            "side_effect_risk": "={{ $('Get Incident').first().json.side_effect_risk }}",
+            "approval_status": "={{ $('Build Approval Granted Update').first().json.approval_status }}",
+            "idempotency_guaranteed": "={{ $('Get Incident').first().json.idempotency_guaranteed }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "retry_count",
+              "displayName": "retry_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "max_retries",
+              "displayName": "max_retries",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "retry_safety",
+              "displayName": "retry_safety",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "side_effect_risk",
+              "displayName": "side_effect_risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "idempotency_guaranteed",
+              "displayName": "idempotency_guaranteed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1952,
+        -96
+      ],
+      "id": "1efbdd25-5abf-463b-84e9-bbb197f791ef",
+      "name": "Call 'Panoptes OS — SW — Retry Execution'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const retry = $input.first().json;\n\nif (!retry.incident_id) {\n  throw new Error('Panoptes retry result missing incident_id');\n}\n\nif (!retry.retry_execution_id) {\n  throw new Error('Panoptes retry did not return a retry_execution_id');\n}\n\nreturn [{\n  json: {\n    incident_id: retry.incident_id,\n\n    status: 'VERIFYING',\n    retry_count: retry.new_retry_count,\n\n    proposed_action: 'RETRY',\n\n    last_action: 'retry_execution',\n\n    last_action_result: {\n      success: retry.retry_result_received === true,\n      original_execution_id: retry.original_execution_id,\n      retry_execution_id: retry.retry_execution_id,\n      previous_retry_count: retry.previous_retry_count,\n      new_retry_count: retry.new_retry_count\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2624,
+        160
+      ],
+      "id": "dac9babb-0f1c-47cf-b87e-e6e4f996eb07",
+      "name": "Build Recovery Attempt Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build RECOVERY_ATTEMPTED Event — Panoptes M8\n\nconst update = $('Build Recovery Attempt Update').first().json;\n\nif (!update.incident_id) {\n  throw new Error('Panoptes recovery event missing incident_id');\n}\n\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id: `EVT-${update.incident_id.replace(/^INC-/, '')}-RECOVERY-ATTEMPTED-${result.new_retry_count ?? 0}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'RECOVERY_ATTEMPTED',\n\n    event_message: `Panoptes requested retry execution ${result.retry_execution_id ?? 'unknown'} for failed execution ${result.original_execution_id ?? 'unknown'}.`,\n\n    old_status: 'RECOVERING',\n    new_status: 'VERIFYING',\n\n    tool_name: 'retry_execution',\n\n    tool_result: {\n      success: result.success ?? false,\n      original_execution_id: result.original_execution_id ?? null,\n      retry_execution_id: result.retry_execution_id ?? null,\n      previous_retry_count: result.previous_retry_count ?? null,\n      new_retry_count: result.new_retry_count ?? null\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3056,
+        160
+      ],
+      "id": "5f0d2a01-1251-4854-88dd-43a0a3c9952b",
+      "name": "Build RECOVERY_ATTEMPTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_VERIFY_RECOVERY",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "retry_count": "={{ $('Build Recovery Attempt Update').first().json.retry_count }}",
+            "max_retries": "={{ $('Build Approval Granted Update').first().json.max_retries }}",
+            "incident_id": "={{ $('Build Recovery Attempt Update').first().json.incident_id }}",
+            "retry_execution_id": "={{ $('Build Recovery Attempt Update').first().json.last_action_result.retry_execution_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "retry_execution_id",
+              "displayName": "retry_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "retry_count",
+              "displayName": "retry_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "max_retries",
+              "displayName": "max_retries",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3472,
+        160
+      ],
+      "id": "d640b3a3-77bb-4428-befd-b91a5c6c52b8",
+      "name": "Call 'Panoptes OS — SW — Verify Recovery'"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2832,
+        160
+      ],
+      "id": "495d52b6-81e3-475b-8be1-7d70bbc2aff7",
+      "name": "Update Incident — VERIFYING START",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Approval Rejected Update — Panoptes M10\n\nconst input = $input.first().json;\n\nif (!input.incident_id) {\n  throw new Error('Rejected recovery missing incident_id');\n}\n\nif (input.decision !== 'REJECT') {\n  throw new Error('Reject branch received non-REJECT decision');\n}\n\nreturn [{\n  json: {\n    incident_id: input.incident_id,\n\n    status: 'ESCALATED',\n    human_required: true,\n\n    proposed_action: null,\n    approval_status: 'REJECTED',\n\n    operator: input.operator,\n    decided_at: input.decided_at,\n\n    last_action: 'human_approval_rejected',\n\n    last_action_result: {\n      success: true,\n      decision: 'REJECT',\n      operator: input.operator\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        96
+      ],
+      "id": "f51187d8-caa5-4040-a896-d611841c4c7b",
+      "name": "Build Approval Rejected Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "incident_id",
+              "fieldValue": "={{ $json.incident_id }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $('Build Approval Rejected Update').first().json.status }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        816,
+        96
+      ],
+      "id": "e9faed2d-2743-4194-8484-94a9b4fc4bab",
+      "name": "Update Incident — REJECTED"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build APPROVAL_REJECTED Event — Panoptes M10\n\nconst update = $('Build Approval Rejected Update').first().json;\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-APPROVAL-REJECTED`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'APPROVAL_REJECTED',\n\n    event_message:\n      `Human operator ${update.operator} rejected the proposed recovery action.`,\n\n    old_status: 'WAITING_FOR_APPROVAL',\n    new_status: 'ESCALATED',\n\n    tool_name: null,\n\n    tool_result: {\n      decision: 'REJECT',\n      operator: update.operator,\n      decided_at: update.decided_at\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        96
+      ],
+      "id": "be193145-c5c8-4645-b5c6-e4494f7f0dc9",
+      "name": "Build APPROVAL_REJECTED Event"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status}}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        816,
+        -96
+      ],
+      "id": "4792dec4-0164-4898-b89b-d66b303c485d",
+      "name": "Update Incident — RECOVERING (APPROVED)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.recovery_outcome }}",
+                    "rightValue": "R",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2b143057-b650-413a-ac5a-7bd823bc7dfb"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RECOVERED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "09e643de-7f82-4960-91c1-23144fece084",
+                    "leftValue": "={{ $json.recovery_outcome }}",
+                    "rightValue": "RETRY_FAILED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RETRY_FAILED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1d14fdbb-81ce-4831-a8fb-e8b1636876b8",
+                    "leftValue": "={{ $json.recovery_outcome }}",
+                    "rightValue": "RETRY_EXHAUSTED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RETRY_EXHAUSTED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6319a5c9-8452-4a5c-ad45-195668485fa5",
+                    "leftValue": "={{ $json.recovery_outcome }}",
+                    "rightValue": "PENDING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PENDING"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3728,
+        416
+      ],
+      "id": "b42e9a9a-4e1c-4629-abe2-847980ba281b",
+      "name": "Route Recovery Outcome"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Recovered Update — Panoptes M9\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error('Panoptes recovered update missing incident_id');\n}\n\nif (result.recovery_outcome !== 'RECOVERED') {\n  throw new Error('Recovered branch received non-RECOVERED outcome');\n}\n\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'RECOVERED',\n    human_required: false,\n\n    proposed_action: null,\n    approval_status: 'NOT_REQUIRED',\n\n    retry_count: result.retry_count,\n\n    last_action: 'verify_recovery',\n\n    last_action_result: {\n      success: true,\n      recovery_outcome: result.recovery_outcome,\n      retry_execution_id: result.retry_execution_id,\n      retry_execution_status: result.retry_execution_status,\n      reason: result.reason\n    },\n\n    updated_at: now,\n    resolved_at: now\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        32
+      ],
+      "id": "745ed999-4368-44ce-b2b6-178661fd99eb",
+      "name": "Build Recovered Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            },
+            {
+              "fieldId": "resolved_at",
+              "fieldValue": "={{ $json.resolved_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4464,
+        32
+      ],
+      "id": "eb544b8b-c500-4498-aaba-23d39e4b2b10",
+      "name": "Update Incident — RECOVERED"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build INCIDENT_RECOVERED Event — Panoptes M9\n\nconst update = $('Build Recovered Update').first().json;\n\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-RECOVERED-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'INCIDENT_RECOVERED',\n\n    event_message:\n      `Retry execution ${result.retry_execution_id ?? 'unknown'} completed successfully and the incident was recovered.`,\n\n    old_status: 'VERIFYING',\n    new_status: 'RECOVERED',\n\n    tool_name: 'verify_recovery',\n\n    tool_result: {\n      success: true,\n      retry_execution_id: result.retry_execution_id ?? null,\n      retry_execution_status: result.retry_execution_status ?? null,\n      recovery_outcome: result.recovery_outcome ?? 'RECOVERED'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        32
+      ],
+      "id": "c917a2dc-e9c6-4050-811e-d9d31d74d473",
+      "name": "Build INCIDENT_RECOVERED Event"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Retry Failed Update — Panoptes M9\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error('Panoptes retry-failed update missing incident_id');\n}\n\nif (result.recovery_outcome !== 'RETRY_FAILED') {\n  throw new Error('Retry-failed branch received unexpected recovery outcome');\n}\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'RECOVERY_PENDING',\n    human_required: false,\n\n    retry_count: result.retry_count,\n\n    proposed_action: 'RETRY',\n    approval_status: 'NOT_REQUIRED',\n\n    last_action: 'verify_recovery',\n\n    last_action_result: {\n      success: false,\n      recovery_outcome: result.recovery_outcome,\n      retry_execution_id: result.retry_execution_id,\n      retry_execution_status: result.retry_execution_status,\n      loop_required: result.loop_required,\n      reason: result.reason\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        288
+      ],
+      "id": "ec5c78ce-faca-4bf3-b4db-36c07e34beca",
+      "name": "Build Retry Failed Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4464,
+        288
+      ],
+      "id": "2189e826-c6a7-4766-9127-94ad05f58514",
+      "name": "Update Incident — RECOVERY_PENDING"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build RETRY_FAILED Event — Panoptes M9\n\nconst update = $('Build Retry Failed Update').first().json;\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-RETRY-FAILED-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'RETRY_FAILED',\n\n    event_message:\n      `Retry execution ${result.retry_execution_id ?? 'unknown'} failed, but recovery attempts remain.`,\n\n    old_status: 'VERIFYING',\n    new_status: 'RECOVERY_PENDING',\n\n    tool_name: 'verify_recovery',\n\n    tool_result: {\n      success: false,\n      retry_execution_id: result.retry_execution_id ?? null,\n      retry_execution_status: result.retry_execution_status ?? null,\n      recovery_outcome: result.recovery_outcome ?? 'RETRY_FAILED',\n      loop_required: result.loop_required ?? false\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        288
+      ],
+      "id": "8680277d-57b3-4ea0-970c-509e0e3a991b",
+      "name": "Build RETRY_FAILED Event"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Retry Exhausted Update — Panoptes M9\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error('Panoptes retry-exhausted update missing incident_id');\n}\n\nif (result.recovery_outcome !== 'RETRY_EXHAUSTED') {\n  throw new Error(\n    'Retry-exhausted branch received unexpected recovery outcome'\n  );\n}\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'ESCALATED',\n    human_required: true,\n\n    retry_count: result.retry_count,\n\n    proposed_action: null,\n    approval_status: 'NOT_REQUIRED',\n\n    last_action: 'verify_recovery',\n\n    last_action_result: {\n      success: false,\n      recovery_outcome: result.recovery_outcome,\n      retry_execution_id: result.retry_execution_id,\n      retry_execution_status: result.retry_execution_status,\n      retry_count: result.retry_count,\n      max_retries: result.max_retries,\n      reason: result.reason\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        576
+      ],
+      "id": "e6f14f6e-43f4-4bfe-b124-576468192ab9",
+      "name": "Build Retry Exhausted Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build RETRY_EXHAUSTED Event — Panoptes M9\n\nconst update = $('Build Retry Exhausted Update').first().json;\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-RETRY-EXHAUSTED-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'RETRY_EXHAUSTED',\n\n    event_message:\n      `Retry execution ${result.retry_execution_id ?? 'unknown'} failed and the recovery attempt budget was exhausted.`,\n\n    old_status: 'VERIFYING',\n    new_status: 'ESCALATED',\n\n    tool_name: 'verify_recovery',\n\n    tool_result: {\n      success: false,\n      retry_execution_id: result.retry_execution_id ?? null,\n      retry_execution_status: result.retry_execution_status ?? null,\n      retry_count: result.retry_count ?? null,\n      max_retries: result.max_retries ?? null,\n      recovery_outcome:\n        result.recovery_outcome ?? 'RETRY_EXHAUSTED'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        576
+      ],
+      "id": "cd48e427-ce3f-4686-baf2-954b20122828",
+      "name": "Build RETRY_EXHAUSTED Event"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Verification Pending Update — Panoptes M9\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error(\n    'Panoptes verification-pending update missing incident_id'\n  );\n}\n\nif (result.recovery_outcome !== 'PENDING') {\n  throw new Error(\n    'Pending branch received unexpected recovery outcome'\n  );\n}\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'VERIFYING',\n    human_required: false,\n\n    retry_count: result.retry_count,\n\n    proposed_action: null,\n    approval_status: 'NOT_REQUIRED',\n\n    last_action: 'verification_pending',\n\n    last_action_result: {\n      success: null,\n      recovery_outcome: result.recovery_outcome,\n      retry_execution_id: result.retry_execution_id,\n      retry_execution_status: result.retry_execution_status,\n      reason: result.reason\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        832
+      ],
+      "id": "64cba995-3f99-4a52-855a-134fcacf6b9f",
+      "name": "Build Verification Pending Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build VERIFICATION_PENDING Event — Panoptes M9\n\nconst update = $('Build Verification Pending Update').first().json;\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-VERIFICATION-PENDING-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'VERIFICATION_PENDING',\n\n    event_message:\n      `Retry execution ${result.retry_execution_id ?? 'unknown'} has not reached a terminal state yet.`,\n\n    old_status: 'VERIFYING',\n    new_status: 'VERIFYING',\n\n    tool_name: 'verify_recovery',\n\n    tool_result: {\n      success: null,\n      retry_execution_id: result.retry_execution_id ?? null,\n      retry_execution_status: result.retry_execution_status ?? null,\n      recovery_outcome:\n        result.recovery_outcome ?? 'PENDING'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        832
+      ],
+      "id": "9d30fd2b-ce13-4297-8383-93926728d5d6",
+      "name": "Build VERIFICATION_PENDING Event"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4464,
+        576
+      ],
+      "id": "b1802986-7a3f-4b81-a4f5-81d4c73931b0",
+      "name": "Update Incident — ESCALATED"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4464,
+        832
+      ],
+      "id": "fcbed485-a19e-4c1b-bc33-dec26f04f7bd",
+      "name": "Update Incident — VERIFYING PENDING"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        288
+      ],
+      "id": "add9870a-ee97-46ae-b47e-80a8152af0d3",
+      "name": "Create RETRY_FAILED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        32
+      ],
+      "id": "07105590-69bd-43c0-9d84-7f3a06dfdbc5",
+      "name": "Create INCIDENT_RECOVERED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        576
+      ],
+      "id": "9dcfefb3-ac1d-4829-8cc9-246e5778afce",
+      "name": "Create RETRY_EXHAUSTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4928,
+        832
+      ],
+      "id": "8d2bd4da-9c0b-4a0c-a9c0-66f538e3f06e",
+      "name": "Create VERIFICATION_PENDING Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3248,
+        160
+      ],
+      "id": "54cc5f3b-ca28-4826-a14b-291641300365",
+      "name": "Create RECOVERY_ATTEMPTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        96
+      ],
+      "id": "6fc14e33-cdd8-456b-9be2-926ccc3c158b",
+      "name": "Create APPROVAL_REJECTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        -96
+      ],
+      "id": "db07cb43-d145-44e6-a551-25ff52a4f1c8",
+      "name": "Create APPROVAL_GRANTED Event"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fe38df56-28f3-4a36-a535-4314b6f0ab2f",
+              "leftValue": "={{ $json.retry_budget_exhausted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2176,
+        -96
+      ],
+      "id": "a0b4bb99-b0f1-462c-9223-37dd750a14e6",
+      "name": "Retry Budget Exhausted?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Retry Budget Exhausted Update — Panoptes M11.4\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error('Retry budget result missing incident_id');\n}\n\nif (result.retry_budget_exhausted !== true) {\n  throw new Error('Budget-exhausted branch received non-exhausted result');\n}\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'ESCALATED',\n    human_required: true,\n\n    retry_count: result.new_retry_count,\n\n    proposed_action: null,\n    approval_status: 'APPROVED',\n\n    last_action: 'retry_budget_exhausted',\n\n    last_action_result: {\n      success: false,\n      retry_allowed: false,\n      retry_budget_exhausted: true,\n      original_execution_id: result.original_execution_id,\n      retry_count: result.new_retry_count,\n      reason: result.reason\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        -208
+      ],
+      "id": "bffc60e1-6568-4c7f-8bdf-acc774ab9ef1",
+      "name": "Build Retry Budget Exhausted Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2608,
+        -256
+      ],
+      "id": "407a3680-3118-4200-a3bd-aeea2cc60cac",
+      "name": "Update Incident — ESCALATED (BUDGET)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build RETRY_BUDGET_EXHAUSTED Event — Panoptes M11.4\n\nconst update = $('Build Retry Budget Exhausted Update').first().json;\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-RETRY-BUDGET-EXHAUSTED-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'RETRY_BUDGET_EXHAUSTED',\n\n    event_message:\n      `Automatic recovery stopped because the retry budget was exhausted at ${update.retry_count} attempts.`,\n\n    old_status: 'RECOVERING',\n    new_status: 'ESCALATED',\n\n    tool_name: 'retry_execution',\n\n    tool_result: {\n      success: false,\n      retry_allowed: false,\n      retry_budget_exhausted: true,\n      original_execution_id: result.original_execution_id ?? null,\n      retry_count: result.retry_count ?? update.retry_count,\n      reason: result.reason ?? null\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -256
+      ],
+      "id": "d4608820-f1c2-47fa-92d7-1ea7015b8a9b",
+      "name": "Build RETRY_BUDGET_EXHAUSTED Event"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3024,
+        -256
+      ],
+      "id": "683ac86a-408b-4b21-98c6-eaef0b5161ee",
+      "name": "Call 'Panoptes OS — SW — Write Incident Event'"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "815e784c-d920-4973-bca2-bb29bccbd286",
+              "leftValue": "={{ $json.retry_safety_blocked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2384,
+        32
+      ],
+      "id": "854e9dd9-4b72-4163-b384-e161d1e75c97",
+      "name": "Retry Safety Blocked?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Retry Safety Blocked Update — Panoptes M11.5\n\nconst result = $input.first().json;\n\nif (!result.incident_id) {\n  throw new Error('Retry safety result missing incident_id');\n}\n\nif (result.retry_safety_blocked !== true) {\n  throw new Error('Safety-blocked branch received non-blocked result');\n}\n\nreturn [{\n  json: {\n    incident_id: result.incident_id,\n\n    status: 'ESCALATED',\n    human_required: true,\n\n    retry_count: result.new_retry_count,\n\n    proposed_action: null,\n\n    approval_status:\n      result.approval_status === 'APPROVED'\n        ? 'APPROVED'\n        : 'NOT_REQUIRED',\n\n    last_action: 'retry_safety_blocked',\n\n    last_action_result: {\n      success: false,\n      retry_allowed: false,\n      retry_safety_blocked: true,\n      retry_safety: result.retry_safety,\n      side_effect_risk: result.side_effect_risk,\n      idempotency_guaranteed: result.idempotency_guaranteed,\n      reason: result.reason\n    },\n\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -64
+      ],
+      "id": "af731d7b-644b-48fd-9e3d-354a26cdb481",
+      "name": "Build Retry Safety Blocked Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build RETRY_SAFETY_BLOCKED Event — Panoptes M11.5\n\nconst update = $('Build Retry Safety Blocked Update').first().json;\nconst result = update.last_action_result ?? {};\n\nreturn [{\n  json: {\n    event_id:\n      `EVT-${update.incident_id.replace(/^INC-/, '')}-RETRY-SAFETY-BLOCKED-${update.retry_count}`,\n\n    incident_id: update.incident_id,\n\n    event_type: 'RETRY_SAFETY_BLOCKED',\n\n    event_message:\n      'Automatic recovery was blocked because the retry did not satisfy Panoptes safety requirements.',\n\n    old_status: 'RECOVERING',\n    new_status: 'ESCALATED',\n\n    tool_name: 'retry_execution',\n\n    tool_result: {\n      success: false,\n      retry_allowed: false,\n      retry_safety_blocked: true,\n      retry_safety: result.retry_safety ?? null,\n      side_effect_risk: result.side_effect_risk ?? null,\n      idempotency_guaranteed:\n        result.idempotency_guaranteed ?? false,\n      reason: result.reason ?? null\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        -64
+      ],
+      "id": "b61b141f-ce00-4b51-8b7d-1bfb69540a51",
+      "name": "Build RETRY_SAFETY_BLOCKED Event"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "human_required",
+              "fieldValue": "={{ $json.human_required }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count }}"
+            },
+            {
+              "fieldId": "proposed_action",
+              "fieldValue": "={{ $json.proposed_action}}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $json.approval_status }}"
+            },
+            {
+              "fieldId": "last_action",
+              "fieldValue": "={{ $json.last_action }}"
+            },
+            {
+              "fieldId": "last_action_result",
+              "fieldValue": "={{ $json.last_action_result }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        -64
+      ],
+      "id": "9800b6e8-7d6b-411c-b854-02f62c9a0752",
+      "name": "Update Incident — ESCALATED (SAFETY)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "IMPORT_WRITE_INCIDENT_EVENT",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "incident_id": "={{ $json.incident_id }}",
+            "event_type": "={{ $json.event_type }}",
+            "event_message": "={{ $json.event_message }}",
+            "old_status": "={{ $json.old_status }}",
+            "new_status": "={{ $json.new_status }}",
+            "tool_name": "={{ $json.tool_name }}",
+            "tool_result": "={{ $json.tool_result }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_message",
+              "displayName": "event_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "old_status",
+              "displayName": "old_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "new_status",
+              "displayName": "new_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_name",
+              "displayName": "tool_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tool_result",
+              "displayName": "tool_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3280,
+        -64
+      ],
+      "id": "9cedcf17-c3dd-4709-8139-95cee739148d",
+      "name": "Call 'Panoptes OS — SW — Write Incident Event'1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Approval API Response — REJECT\n\nconst incident = $('Get Incident').first().json;\nconst request = $('Validate Approval Request').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    action: 'REJECT',\n    incident_id: incident.incident_id,\n    operator: request.operator,\n    message: 'Recovery request rejected by operator.',\n    previous_status: 'WAITING_FOR_APPROVAL'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        96
+      ],
+      "id": "ca375483-7f85-44bd-8bbb-dd45900288ce",
+      "name": "Build Approval API Response — REJECT"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Approval API Response — APPROVE\n\nconst incident = $('Get Incident').first().json;\nconst request = $('Validate Approval Request').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    action: 'APPROVE',\n    incident_id: incident.incident_id,\n    operator: request.operator,\n    message: 'Approval accepted. Panoptes resumed recovery.',\n    previous_status: 'WAITING_FOR_APPROVAL'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        -96
+      ],
+      "id": "74da0e67-ce61-45de-a639-964a6bb0f760",
+      "name": "Build Approval API Response — APPROVE"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1728,
+        96
+      ],
+      "id": "eeb4cf0a-8b02-4df5-a9a1-a70fce5739ea",
+      "name": "Respond to Webhook — REJECT"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1728,
+        -96
+      ],
+      "id": "70dd7181-52a1-4c0e-b4ab-91bc354de80c",
+      "name": "Respond to Webhook — APPROVE"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Approval Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Approval Request": {
+      "main": [
+        [
+          {
+            "node": "Get Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Incident": {
+      "main": [
+        [
+          {
+            "node": "Validate Pending Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Pending Approval": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Build Approval Granted Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Approval Rejected Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approval Granted Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — RECOVERING (APPROVED)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build APPROVAL_GRANTED Event": {
+      "main": [
+        [
+          {
+            "node": "Create APPROVAL_GRANTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Panoptes OS — SW — Retry Execution'": {
+      "main": [
+        [
+          {
+            "node": "Retry Budget Exhausted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Recovery Attempt Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — VERIFYING START",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RECOVERY_ATTEMPTED Event": {
+      "main": [
+        [
+          {
+            "node": "Create RECOVERY_ATTEMPTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Panoptes OS — SW — Verify Recovery'": {
+      "main": [
+        [
+          {
+            "node": "Route Recovery Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — VERIFYING START": {
+      "main": [
+        [
+          {
+            "node": "Build RECOVERY_ATTEMPTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approval Rejected Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — REJECTED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — REJECTED": {
+      "main": [
+        [
+          {
+            "node": "Build APPROVAL_REJECTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build APPROVAL_REJECTED Event": {
+      "main": [
+        [
+          {
+            "node": "Create APPROVAL_REJECTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — RECOVERING (APPROVED)": {
+      "main": [
+        [
+          {
+            "node": "Build APPROVAL_GRANTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Recovery Outcome": {
+      "main": [
+        [
+          {
+            "node": "Build Recovered Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Retry Failed Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Retry Exhausted Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Verification Pending Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Recovered Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — RECOVERED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — RECOVERED": {
+      "main": [
+        [
+          {
+            "node": "Build INCIDENT_RECOVERED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build INCIDENT_RECOVERED Event": {
+      "main": [
+        [
+          {
+            "node": "Create INCIDENT_RECOVERED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retry Failed Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — RECOVERY_PENDING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — RECOVERY_PENDING": {
+      "main": [
+        [
+          {
+            "node": "Build RETRY_FAILED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RETRY_FAILED Event": {
+      "main": [
+        [
+          {
+            "node": "Create RETRY_FAILED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retry Exhausted Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — ESCALATED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RETRY_EXHAUSTED Event": {
+      "main": [
+        [
+          {
+            "node": "Create RETRY_EXHAUSTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Verification Pending Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — VERIFYING PENDING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build VERIFICATION_PENDING Event": {
+      "main": [
+        [
+          {
+            "node": "Create VERIFICATION_PENDING Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — ESCALATED": {
+      "main": [
+        [
+          {
+            "node": "Build RETRY_EXHAUSTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — VERIFYING PENDING": {
+      "main": [
+        [
+          {
+            "node": "Build VERIFICATION_PENDING Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create RECOVERY_ATTEMPTED Event": {
+      "main": [
+        [
+          {
+            "node": "Call 'Panoptes OS — SW — Verify Recovery'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create APPROVAL_GRANTED Event": {
+      "main": [
+        [
+          {
+            "node": "Build Approval API Response — APPROVE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Budget Exhausted?": {
+      "main": [
+        [
+          {
+            "node": "Build Retry Budget Exhausted Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Safety Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retry Budget Exhausted Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — ESCALATED (BUDGET)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — ESCALATED (BUDGET)": {
+      "main": [
+        [
+          {
+            "node": "Build RETRY_BUDGET_EXHAUSTED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RETRY_BUDGET_EXHAUSTED Event": {
+      "main": [
+        [
+          {
+            "node": "Call 'Panoptes OS — SW — Write Incident Event'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Safety Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Build Retry Safety Blocked Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Recovery Attempt Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retry Safety Blocked Update": {
+      "main": [
+        [
+          {
+            "node": "Update Incident — ESCALATED (SAFETY)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RETRY_SAFETY_BLOCKED Event": {
+      "main": [
+        [
+          {
+            "node": "Call 'Panoptes OS — SW — Write Incident Event'1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Incident — ESCALATED (SAFETY)": {
+      "main": [
+        [
+          {
+            "node": "Build RETRY_SAFETY_BLOCKED Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create APPROVAL_REJECTED Event": {
+      "main": [
+        [
+          {
+            "node": "Build Approval API Response — REJECT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approval API Response — APPROVE": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook — APPROVE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approval API Response — REJECT": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook — REJECT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook — APPROVE": {
+      "main": [
+        [
+          {
+            "node": "Call 'Panoptes OS — SW — Retry Execution'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

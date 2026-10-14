@@ -1,0 +1,358 @@
+{
+  "name": "Panoptes OS — API — Operator Console",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "panoptes_incidents",
+        "returnAll": true,
+        "orderBy": "created_at.desc",
+        "filterType": "none"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "66770422-9805-4849-bc2a-8538efae6b15",
+      "name": "Get Incidents",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Incident List Response — Panoptes M16\n\nconst inputs = $input.all().map(item => item.json);\n\nlet rows = [];\n\nfor (const input of inputs) {\n  if (Array.isArray(input)) {\n    rows.push(...input);\n  } else if (Array.isArray(input.data)) {\n    rows.push(...input.data);\n  } else if (\n    input.data &&\n    typeof input.data === 'object' &&\n    !Array.isArray(input.data)\n  ) {\n    rows.push(input.data);\n  } else if (input.incident_id) {\n    rows.push(input);\n  }\n}\n\nconst incidents = rows.map(i => ({\n  incident_id: i.incident_id,\n\n  workflow: {\n    id: i.workflow_id ?? null,\n    name: i.workflow_name ?? null\n  },\n\n  execution: {\n    id: i.execution_id ?? null,\n    url: i.execution_url ?? null,\n    failed_node: i.failed_node ?? null,\n    mode: i.execution_mode ?? null\n  },\n\n  diagnosis: {\n    failure_type: i.failure_type ?? null,\n    transience: i.transience ?? null,\n    retry_safety: i.retry_safety ?? null,\n    side_effect_risk: i.side_effect_risk ?? null,\n    summary: i.diagnosis ?? null,\n    confidence: i.diagnosis_confidence ?? null\n  },\n\n  recovery: {\n    status: i.status ?? null,\n    retry_count: i.retry_count ?? 0,\n    max_retries: i.max_retries ?? 0,\n    proposed_action: i.proposed_action ?? null,\n    approval_status: i.approval_status ?? null,\n    human_required: i.human_required ?? false\n  },\n\n  timestamps: {\n    occurred_at: i.occurred_at ?? null,\n    created_at: i.created_at ?? null,\n    updated_at: i.updated_at ?? null,\n    resolved_at: i.resolved_at ?? null\n  }\n}));\n\nreturn [{\n  json: {\n    success: true,\n    count: incidents.length,\n    incidents\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "be31aa76-36b4-40eb-98a6-67fec000fddf",
+      "name": "Build Incident List Response"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "f945eed7-2490-498e-a0eb-374b7c0f7947",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst incidentId =\n  input.query?.incident_id ??\n  input.incident_id ??\n  null;\n\nif (!incidentId) {\n  throw new Error('Operator API missing incident_id');\n}\n\nreturn [{\n  json: {\n    incident_id: String(incidentId)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        256
+      ],
+      "id": "b39d7962-6ff6-4a0b-9d5f-ebe9ebdf72ce",
+      "name": "Validate Incident ID"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "panoptes_incidents",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "keyValue": "={{ $json.incident_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        560,
+        256
+      ],
+      "id": "999b9652-908c-46ba-8b0a-5c4210ad6b48",
+      "name": "Get Incident",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const incident = $('Get Incident').first().json;\n\nif (!incident?.incident_id) {\n  return [{\n    json: {\n      success: false,\n      error: 'INCIDENT_NOT_FOUND'\n    }\n  }];\n}\n\nconst events = $input\n  .all()\n  .map(item => item.json)\n  .filter(e => e?.event_id);\n\nreturn [{\n  json: {\n    success: true,\n\n    incident: {\n      incident_id: incident.incident_id,\n\n      workflow: {\n        id: incident.workflow_id ?? null,\n        name: incident.workflow_name ?? null\n      },\n\n      execution: {\n        id: incident.execution_id ?? null,\n        url: incident.execution_url ?? null,\n        failed_node: incident.failed_node ?? null,\n        mode: incident.execution_mode ?? null,\n\n        error: {\n          name: incident.error_name ?? null,\n          message: incident.error_message ?? null\n        }\n      },\n\n      diagnosis: {\n        failure_type: incident.failure_type ?? null,\n        transience: incident.transience ?? null,\n        retry_safety: incident.retry_safety ?? null,\n        side_effect_risk: incident.side_effect_risk ?? null,\n        summary: incident.diagnosis ?? null,\n        confidence: incident.diagnosis_confidence ?? null\n      },\n\n      recovery: {\n        status: incident.status ?? null,\n        retry_count: incident.retry_count ?? 0,\n        max_retries: incident.max_retries ?? 0,\n        proposed_action: incident.proposed_action ?? null,\n        approval_status: incident.approval_status ?? null,\n        human_required: incident.human_required ?? false,\n        last_action: incident.last_action ?? null,\n        last_action_result: incident.last_action_result ?? null\n      },\n\n      config: {\n        auto_recovery_enabled:\n          incident.auto_recovery_enabled ?? false,\n\n        idempotency_guaranteed:\n          incident.idempotency_guaranteed ?? false\n      },\n\n      timestamps: {\n        occurred_at: incident.occurred_at ?? null,\n        created_at: incident.created_at ?? null,\n        updated_at: incident.updated_at ?? null,\n        resolved_at: incident.resolved_at ?? null\n      }\n    },\n\n    timeline: events.map(e => ({\n      event_id: e.event_id,\n      type: e.event_type,\n      message: e.event_message,\n      old_status: e.old_status,\n      new_status: e.new_status,\n      tool_name: e.tool_name,\n      tool_result: e.tool_result,\n      timestamp: e.event_timestamp\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        256
+      ],
+      "id": "9a5fdac9-e0c2-4442-84f2-48340a06bb81",
+      "name": "Build Incident Detail Response"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1232,
+        256
+      ],
+      "id": "9f77aef9-845c-40a9-85ed-fd83787fda88",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "panoptes_incident_events",
+        "returnAll": true,
+        "orderBy": "event_timestamp.asc",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "incident_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Incident ID').first().json.incident_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        256
+      ],
+      "id": "27dc31ee-c1f8-4bdf-8bbe-0202feeb427d",
+      "name": "Get Incident Events",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "path": "/panoptes/incidents",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        0
+      ],
+      "id": "898769f6-43d2-4a14-afc9-6d9b9c8c98ad",
+      "name": "Panoptes/Incidents"
+    },
+    {
+      "parameters": {
+        "path": "panoptes/incident",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        80,
+        256
+      ],
+      "id": "b442311b-d946-4ff1-be73-fe722084a38a",
+      "name": "Panoptes/Incident"
+    },
+    {
+      "parameters": {
+        "path": "panoptes/summary",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        528
+      ],
+      "id": "c2af4470-2f3d-46f2-95fb-6f22f50fcccf",
+      "name": "panoptes/summary"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "panoptes_incident_observability",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        528
+      ],
+      "id": "3ecd802d-65bb-4633-9da5-4c2bd61f7cd9",
+      "name": "Get many rows",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input\n  .all()\n  .map(item => item.json)\n  .filter(row => row?.incident_id);\n\nconst countStatus = status =>\n  rows.filter(row => row.status === status).length;\n\nconst failureTypes = {};\n\nfor (const row of rows) {\n  const type = row.failure_type ?? 'UNKNOWN';\n  failureTypes[type] = (failureTypes[type] ?? 0) + 1;\n}\n\nconst requiringHuman = rows.filter(\n  row => row.human_required === true\n).length;\n\nconst awaitingApproval = rows.filter(\n  row =>\n    row.status === 'WAITING_FOR_APPROVAL' ||\n    row.approval_status === 'PENDING'\n).length;\n\nconst retryAttempts = rows.reduce(\n  (sum, row) => sum + Number(row.retry_count ?? 0),\n  0\n);\n\nreturn [{\n  json: {\n    success: true,\n\n    totals: {\n      incidents: rows.length,\n      escalated: countStatus('ESCALATED'),\n      recovered: countStatus('RECOVERED'),\n      recovery_pending: countStatus('RECOVERY_PENDING'),\n      recovering: countStatus('RECOVERING'),\n      verifying: countStatus('VERIFYING'),\n      awaiting_approval: awaitingApproval,\n      requiring_human: requiringHuman\n    },\n\n    recovery: {\n      total_retry_attempts: retryAttempts\n    },\n\n    failure_types: failureTypes,\n\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        528
+      ],
+      "id": "862a0ba0-f3bb-46e3-8d7a-60465c86b212",
+      "name": "Build Dashboard Summary"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        960,
+        528
+      ],
+      "id": "c29c56d6-ff90-468a-8c12-426f1fa98ff3",
+      "name": "Respond to Webhook2"
+    }
+  ],
+  "connections": {
+    "Get Incidents": {
+      "main": [
+        [
+          {
+            "node": "Build Incident List Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Incident List Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Incident ID": {
+      "main": [
+        [
+          {
+            "node": "Get Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Incident": {
+      "main": [
+        [
+          {
+            "node": "Get Incident Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Incident Detail Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Incident Events": {
+      "main": [
+        [
+          {
+            "node": "Build Incident Detail Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panoptes/Incidents": {
+      "main": [
+        [
+          {
+            "node": "Get Incidents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panoptes/Incident": {
+      "main": [
+        [
+          {
+            "node": "Validate Incident ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "panoptes/summary": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Build Dashboard Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dashboard Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

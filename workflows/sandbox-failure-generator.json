@@ -1,0 +1,55 @@
+{
+  "name": "Panoptes OS — Sandbox — Failure Generator",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "IMPORT_ERROR_INTAKE"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "panoptes/failure-generator",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        0
+      ],
+      "id": "ae12e41e-eeaa-49ea-a167-6c7abd4c5def",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "errorMessage": "HTTP 504 GATEWAY TIMEOUT: An external payment request timed out after submission. The dependency failure appears temporary and retryable, but the remote operation may already have completed successfully. Retrying could create a duplicate side effect, so recovery should require explicit human approval before another attempt."
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "9e92d55d-973e-4d8e-9bda-845dacb7b6a9",
+      "name": "Stop and Error"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

@@ -1,0 +1,384 @@
+{
+  "source": "Read-only published local n8n definitions; no credential records or execution data exported",
+  "importTested": false,
+  "workflows": [
+    {
+      "file": "error-intake.json",
+      "name": "[MAIN] Panoptes OS — Error Intake",
+      "optional": false,
+      "nodes": 70,
+      "credentialsToConfigure": [
+        {
+          "node": "Create Incident",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Groq Chat Model",
+          "type": "groqApi"
+        },
+        {
+          "node": "Update Incident",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERING",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERED",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERY_PENDING",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — VERIFYING START",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — VERIFYING PENDING",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — WAITING_FOR_APPROVAL",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Get Execution Lineage",
+          "type": "httpHeaderAuth"
+        },
+        {
+          "node": "Get Existing Incident",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED (BUDGET)",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED (SAFETY)",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — DIAGNOSIS",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Get Workflow Config",
+          "type": "supabaseApi"
+        }
+      ],
+      "dependencyMappings": [
+        {
+          "node": "Call 'Panoptes OS — SW — Collect Evidence'",
+          "placeholder": "IMPORT_COLLECT_EVIDENCE",
+          "target": "collect-evidence.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Retry Execution'",
+          "placeholder": "IMPORT_RETRY_EXECUTION",
+          "target": "retry-execution.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Verify Recovery'",
+          "placeholder": "IMPORT_VERIFY_RECOVERY",
+          "target": "verify-recovery.json"
+        },
+        {
+          "node": "Create RETRY_FAILED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create INCIDENT_RECOVERED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create RETRY_EXHAUSTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create VERIFICATION_PENDING Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create RECOVERY_ATTEMPTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create APPROVAL_REQUESTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create INCIDENT_ESCALATED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create INCIDENT_CREATED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Write Incident Event'",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Write Incident Event'1",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "WRITE INCIDENT EVENT",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        }
+      ],
+      "privateOriginsReplaced": 1,
+      "webhookIdsRemoved": 0,
+      "codeNodesUnchanged": 29
+    },
+    {
+      "file": "sandbox-failure-generator.json",
+      "name": "Panoptes OS — Sandbox — Failure Generator",
+      "optional": true,
+      "nodes": 2,
+      "credentialsToConfigure": [],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 0,
+      "webhookIdsRemoved": 1,
+      "codeNodesUnchanged": 0,
+      "errorWorkflowMapping": {
+        "placeholder": "IMPORT_ERROR_INTAKE",
+        "target": "error-intake.json"
+      }
+    },
+    {
+      "file": "collect-evidence.json",
+      "name": "Panoptes OS — SW — Collect Evidence",
+      "optional": false,
+      "nodes": 9,
+      "credentialsToConfigure": [
+        {
+          "node": "Get Failed Execution",
+          "type": "httpHeaderAuth"
+        },
+        {
+          "node": "Get Workflow Metadata",
+          "type": "httpHeaderAuth"
+        },
+        {
+          "node": "Get Recent Successful Executions",
+          "type": "httpHeaderAuth"
+        }
+      ],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 3,
+      "webhookIdsRemoved": 0,
+      "codeNodesUnchanged": 5
+    },
+    {
+      "file": "retry-execution.json",
+      "name": "Panoptes OS — SW — Retry Execution",
+      "optional": false,
+      "nodes": 10,
+      "credentialsToConfigure": [
+        {
+          "node": "Retry Execution",
+          "type": "httpHeaderAuth"
+        }
+      ],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 1,
+      "webhookIdsRemoved": 0,
+      "codeNodesUnchanged": 6
+    },
+    {
+      "file": "verify-recovery.json",
+      "name": "Panoptes OS — SW — Verify Recovery",
+      "optional": false,
+      "nodes": 5,
+      "credentialsToConfigure": [
+        {
+          "node": "Get Retry Execution",
+          "type": "httpHeaderAuth"
+        }
+      ],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 1,
+      "webhookIdsRemoved": 0,
+      "codeNodesUnchanged": 3
+    },
+    {
+      "file": "human-approval.json",
+      "name": "Panoptes OS — Human Approval",
+      "optional": false,
+      "nodes": 50,
+      "credentialsToConfigure": [
+        {
+          "node": "Webhook",
+          "type": "httpHeaderAuth"
+        },
+        {
+          "node": "Get Incident",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — VERIFYING START",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — REJECTED",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERING (APPROVED)",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERED",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — RECOVERY_PENDING",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — VERIFYING PENDING",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED (BUDGET)",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Update Incident — ESCALATED (SAFETY)",
+          "type": "supabaseApi"
+        }
+      ],
+      "dependencyMappings": [
+        {
+          "node": "Call 'Panoptes OS — SW — Retry Execution'",
+          "placeholder": "IMPORT_RETRY_EXECUTION",
+          "target": "retry-execution.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Verify Recovery'",
+          "placeholder": "IMPORT_VERIFY_RECOVERY",
+          "target": "verify-recovery.json"
+        },
+        {
+          "node": "Create RETRY_FAILED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create INCIDENT_RECOVERED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create RETRY_EXHAUSTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create VERIFICATION_PENDING Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create RECOVERY_ATTEMPTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create APPROVAL_REJECTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Create APPROVAL_GRANTED Event",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Write Incident Event'",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        },
+        {
+          "node": "Call 'Panoptes OS — SW — Write Incident Event'1",
+          "placeholder": "IMPORT_WRITE_INCIDENT_EVENT",
+          "target": "write-incident-event.json"
+        }
+      ],
+      "privateOriginsReplaced": 0,
+      "webhookIdsRemoved": 1,
+      "codeNodesUnchanged": 22
+    },
+    {
+      "file": "write-incident-event.json",
+      "name": "Panoptes OS — SW — Write Incident Event",
+      "optional": false,
+      "nodes": 8,
+      "credentialsToConfigure": [
+        {
+          "node": "Get Existing Event",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Create Incident Event",
+          "type": "supabaseApi"
+        }
+      ],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 0,
+      "webhookIdsRemoved": 0,
+      "codeNodesUnchanged": 4
+    },
+    {
+      "file": "operator-console-api.json",
+      "name": "Panoptes OS — API — Operator Console",
+      "optional": false,
+      "nodes": 14,
+      "credentialsToConfigure": [
+        {
+          "node": "Get Incidents",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Get Incident",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Get Incident Events",
+          "type": "supabaseApi"
+        },
+        {
+          "node": "Get many rows",
+          "type": "supabaseApi"
+        }
+      ],
+      "dependencyMappings": [],
+      "privateOriginsReplaced": 0,
+      "webhookIdsRemoved": 3,
+      "codeNodesUnchanged": 4
+    }
+  ]
+}

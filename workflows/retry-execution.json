@@ -1,0 +1,311 @@
+{
+  "name": "Panoptes OS — SW — Retry Execution",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "incident_id"
+            },
+            {
+              "name": "execution_id"
+            },
+            {
+              "name": "retry_count",
+              "type": "number"
+            },
+            {
+              "name": "max_retries",
+              "type": "number"
+            },
+            {
+              "name": "retry_safety"
+            },
+            {
+              "name": "side_effect_risk"
+            },
+            {
+              "name": "approval_status"
+            },
+            {
+              "name": "idempotency_guaranteed",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        288,
+        0
+      ],
+      "id": "c23daae3-4bad-4cce-be8a-a2cfe8835f01",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Retry Request — Panoptes M11.5\n\nconst input = $input.first().json;\n\nconst incidentId = input.incident_id ?? null;\nconst executionId = input.execution_id ?? null;\n\nconst retryCount = Number(input.retry_count);\nconst maxRetries = Number(input.max_retries);\n\nif (!incidentId) {\n  throw new Error('Panoptes retry request missing incident_id');\n}\n\nif (!executionId) {\n  throw new Error('Panoptes retry request missing execution_id');\n}\n\nif (!Number.isInteger(retryCount) || retryCount < 0) {\n  throw new Error('Invalid retry_count');\n}\n\nif (!Number.isInteger(maxRetries) || maxRetries < 0) {\n  throw new Error('Invalid max_retries');\n}\n\nreturn [{\n  json: {\n    incident_id: String(incidentId),\n    execution_id: String(executionId),\n\n    retry_count: retryCount,\n    max_retries: maxRetries,\n\n    retry_safety:\n      String(input.retry_safety ?? 'UNKNOWN').toUpperCase(),\n\n    side_effect_risk:\n      String(input.side_effect_risk ?? 'UNKNOWN').toUpperCase(),\n\n    approval_status:\n      String(input.approval_status ?? 'NOT_REQUIRED').toUpperCase(),\n\n    idempotency_guaranteed:\n      input.idempotency_guaranteed === true\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        0
+      ],
+      "id": "4d3f79b4-1cba-492d-a080-942f96f10b86",
+      "name": "Validate Retry Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://n8n.example.invalid/api/v1/executions/{{ $json.execution_id }}/retry",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1696,
+        -352
+      ],
+      "id": "c89f5824-7d3a-443c-aa08-5ca52bd834f0",
+      "name": "Retry Execution",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst request = $('Validate Retry Request').first().json;\n\nreturn [{\n  json: {\n    incident_id: request.incident_id,\n\n    original_execution_id: request.execution_id,\n\n    retry_execution_id:\n      response.id ? String(response.id) : null,\n\n    previous_retry_count: request.retry_count,\n    new_retry_count: request.retry_count + 1,\n\n    retry_requested: true,\n    retry_result_received: Boolean(response.id),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        -464
+      ],
+      "id": "9db6c599-d907-4f59-851c-b908b8615f06",
+      "name": "Normalize Retry Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check Retry Budget — Panoptes M11.4\n\nconst input = $input.first().json;\n\nconst retryCount = Number(input.retry_count);\nconst maxRetries = Number(input.max_retries);\n\nif (!Number.isInteger(retryCount) || retryCount < 0) {\n  throw new Error('Panoptes retry budget has invalid retry_count');\n}\n\nif (!Number.isInteger(maxRetries) || maxRetries < 0) {\n  throw new Error('Panoptes retry budget has invalid max_retries');\n}\n\nconst retryAllowed = retryCount < maxRetries;\n\nreturn [{\n  json: {\n    ...input,\n\n    retry_allowed: retryAllowed,\n    retry_budget_exhausted: !retryAllowed,\n\n    attempts_remaining: Math.max(\n      maxRetries - retryCount,\n      0\n    )\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "id": "7bf8c815-a92c-46d6-9e64-31de128b90c0",
+      "name": "Check Retry Budget"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return Retry Budget Exhausted — Panoptes M11.4\n\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    incident_id: input.incident_id,\n    original_execution_id: input.execution_id,\n\n    retry_execution_id: null,\n\n    previous_retry_count: input.retry_count,\n    new_retry_count: input.retry_count,\n\n    retry_requested: false,\n    retry_result_received: false,\n\n    retry_allowed: false,\n    retry_budget_exhausted: true,\n\n    reason:\n      `Retry budget exhausted: ${input.retry_count}/${input.max_retries} attempts already used.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        160
+      ],
+      "id": "139e1012-7389-46e8-a7c6-a83ccdeadf10",
+      "name": "Return Retry Budget Exhausted"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check Retry Safety — Panoptes M11.5\n\nconst input = $input.first().json;\n\nconst retrySafety = input.retry_safety;\nconst sideEffectRisk = input.side_effect_risk;\nconst approvalStatus = input.approval_status;\nconst idempotent = input.idempotency_guaranteed === true;\n\nlet safetyAllowed = false;\nlet safetyReason = null;\n\n// Explicit UNSAFE always fails closed.\nif (retrySafety === 'UNSAFE') {\n  safetyAllowed = false;\n  safetyReason =\n    'Retry is explicitly classified as UNSAFE.';\n}\n\n// Trusted idempotency guarantee permits repetition\n// unless the operation was explicitly marked UNSAFE.\nelse if (idempotent) {\n  safetyAllowed = true;\n  safetyReason =\n    'Retry permitted because the operation has a trusted idempotency guarantee.';\n}\n\n// Ordinary automatic retry.\nelse if (\n  retrySafety === 'SAFE' &&\n  sideEffectRisk === 'NONE'\n) {\n  safetyAllowed = true;\n  safetyReason =\n    'Retry is classified SAFE with no identified side-effect risk.';\n}\n\n// Conditional operation may proceed only after explicit human approval.\nelse if (\n  retrySafety === 'CONDITIONAL' &&\n  approvalStatus === 'APPROVED'\n) {\n  safetyAllowed = true;\n  safetyReason =\n    'Conditional retry explicitly authorized by a human operator.';\n}\n\n// Everything else fails closed.\nelse {\n  safetyAllowed = false;\n  safetyReason =\n    `Retry blocked: safety=${retrySafety}, side_effect_risk=${sideEffectRisk}, approval_status=${approvalStatus}, idempotency_guaranteed=${idempotent}.`;\n}\n\nreturn [{\n  json: {\n    ...input,\n\n    retry_safety_allowed: safetyAllowed,\n    retry_safety_blocked: !safetyAllowed,\n    safety_reason: safetyReason\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -112
+      ],
+      "id": "f7fdeba6-17df-4faf-8310-67475f8ddb1b",
+      "name": "Check Retry Safety"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1aa74892-f42f-4660-a9c7-81ea61178b37",
+              "leftValue": "={{ $json.retry_safety_allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1472,
+        -208
+      ],
+      "id": "8eb53347-82a7-40f4-92bb-4a698fa5320e",
+      "name": "Retry Safety Allowed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a4a51df2-46c0-4152-90ce-4087a0f3afcc",
+              "leftValue": "={{ $json.retry_allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "230101e2-618d-4b15-a475-ac80d830f90b",
+      "name": "Retry Allowed?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return Retry Safety Blocked — Panoptes M11.5\n\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    incident_id: input.incident_id,\n    original_execution_id: input.execution_id,\n\n    retry_execution_id: null,\n\n    previous_retry_count: input.retry_count,\n    new_retry_count: input.retry_count,\n\n    retry_requested: false,\n    retry_result_received: false,\n\n    retry_allowed: false,\n    retry_budget_exhausted: false,\n\n    retry_safety_allowed: false,\n    retry_safety_blocked: true,\n\n    retry_safety: input.retry_safety,\n    side_effect_risk: input.side_effect_risk,\n    approval_status: input.approval_status,\n    idempotency_guaranteed: input.idempotency_guaranteed,\n\n    reason: input.safety_reason\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        -112
+      ],
+      "id": "b813fe88-b896-4569-937e-fba378ebf5ab",
+      "name": "Return Retry Safety Blocked"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Retry Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Retry Request": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Budget",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Execution": {
+      "main": [
+        [
+          {
+            "node": "Normalize Retry Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Budget": {
+      "main": [
+        [
+          {
+            "node": "Retry Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Safety": {
+      "main": [
+        [
+          {
+            "node": "Retry Safety Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Safety Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Retry Execution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Retry Safety Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Safety",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Retry Budget Exhausted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

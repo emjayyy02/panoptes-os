@@ -1,5 +1,7 @@
 # Production readiness at US$0/month
 
+Panoptes OS v1 is deployment-ready and locally verified in production mode. Always-on public hosting is intentionally not maintained for this US$0/month portfolio project.
+
 M18.3 verifies **production-mode local execution**. Hosted verification is not performed. No paid resource, trial-backed resource, payment-method-backed service, tunnel, domain, or always-on hosted process is required or provisioned. Local verification containers stop when checks finish. The Windows PC is a development/verification machine, not a claimed production host.
 
 ## Architecture and ingress requirements
@@ -23,7 +25,7 @@ No provider is a required dependency. Render Free can run the combined stateless
 
 The browser API is always `/api/panoptes`. Obsolete M17 API/proxy overrides are ignored. Never put privileged credentials, allowlist IDs, or approval Header Auth into `VITE_*`. The frontend/gateway need no service-role key. n8n separately requires its existing trusted Supabase/backend and other integration credentials; those never belong in this application's build context or public configuration.
 
-`.env.production.example` contains placeholders only. The real `.env.local` is not inspected or changed. If real local production-mode configuration is needed later, the user may populate a separate ignored `.env.production.local`; keep it outside public assets and container context. Standard build tooling reads public build configuration normally, without logging values. Changing public build settings requires rebuilding the frontend. Inject server secrets only at runtime.
+`.env.production.example` contains placeholders only. M18.3 left the real `.env.local` untouched; public examples contain no real values. M19.1 audited local configuration without printing values and did not modify it. If real local production-mode configuration is needed later, the user may populate a separate ignored `.env.production.local`; keep it outside public assets and container context. Standard build tooling reads public build configuration normally, without logging values. Changing public build settings requires rebuilding the frontend. Inject server secrets only at runtime.
 
 ## Build and start
 
@@ -70,7 +72,7 @@ Browser regression uses pinned Playwright. Windows uses installed Microsoft Edge
 
 `test:production` builds a synthetic production frontend, starts the actual compiled Fastify entry with `NODE_ENV=production`, and exercises the real Supabase SDK against isolated HTTPS fixtures. Gateway TLS rejects the untrusted fixture and succeeds only with its explicit CA. The browser uses a virtual HTTPS origin routed to the loopback process and certificate-verified fixture requests; this verifies rendering and application flows, **not a real public TLS edge**. No Vite server, real account, real workflow or operational data is used. Action tests use only synthetic fixtures. Local read-only Docker tests verify startup, health, non-root execution, context exclusions, source/tool exclusion, and private-path denial.
 
-Evidence under ignored `.qa/m18.3` is separate from M18.1/M18.2. Real Supabase login/read/logout evidence remains the M18.2 record and is not relabeled as a production-mode rerun. Secret scans use canaries and structural checks; actual secrets are not extracted from `.env.local` for exact matching. Browser output legitimately contains public Supabase settings. Docker may heuristically flag the publishable-key build argument because its name contains `KEY`; it is deliberately public, not a privileged secret.
+Evidence under ignored `.qa/m18.3` is separate from M18.1/M18.2. Real Supabase login/read/logout evidence remains the M18.2 record and is not relabeled as a production-mode rerun. Historical M18.3 secret scans used canaries and structural checks; they did not extract actual `.env.local` secrets for exact matching. M19.1 publication scanning is recorded separately in [publication validation](publication.md). Browser output legitimately contains public Supabase settings. Docker may heuristically flag the publishable-key build argument because its name contains `KEY`; it is deliberately public, not a privileged secret.
 
 ## Future free Supabase boundary and deferred hosted verification
 
@@ -88,9 +90,9 @@ Hosted smoke sequence, deferred: anonymous login/API denial â†’ operator login â
 - SessionStorage/XSS exposure and access-token expiry behavior remain as documented in M18.1; approval preflight cannot guarantee acceptance or concurrency outcomes.
 - Opaque backend failures after an approval remain uncertain; no automatic action retry is introduced.
 - Historical row/event quirks and existing retry/recovery policy remain unchanged.
-- GitHub publishing, new product features, M19, and portfolio editing are outside this freeze.
+- GitHub publishing, hosted deployment, new product features and portfolio editing remain deferred. M19.1 changes public packaging/documentation only.
 
-## References checked 2026-10-14
+## Historical hosting assessment references (M18.3, 2026-10-14)
 
 - [Render Free limits](https://render.com/docs/free) and [billing behavior without a payment method](https://render.com/docs/faq).
 - [Supabase Free project allowance](https://supabase.com/docs/guides/platform/billing-on-supabase) and [inactivity pausing](https://supabase.com/docs/guides/platform/free-project-pausing).

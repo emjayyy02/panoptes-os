@@ -1,0 +1,268 @@
+{
+  "name": "Panoptes OS — SW — Collect Evidence",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "incident_id"
+            },
+            {
+              "name": "workflow_id"
+            },
+            {
+              "name": "execution_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -368,
+        -48
+      ],
+      "id": "1a039e74-9ddf-4a91-8100-6fd63664134f",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Evidence Request — Panoptes M4\n\nconst input = $input.first().json;\n\nconst incidentId = input.incident_id ?? null;\nconst workflowId = input.workflow_id ?? null;\nconst executionId = input.execution_id ?? null;\n\nconst missing = [];\n\nif (!incidentId) missing.push('incident_id');\nif (!workflowId) missing.push('workflow_id');\nif (!executionId) missing.push('execution_id');\n\nif (missing.length > 0) {\n  throw new Error(\n    `Panoptes evidence request missing required fields: ${missing.join(', ')}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      incident_id: String(incidentId),\n      workflow_id: String(workflowId),\n      execution_id: String(executionId),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "66e12715-92ff-4873-8152-7e48c97eb456",
+      "name": "Validate Evidence Request"
+    },
+    {
+      "parameters": {
+        "url": "=https://n8n.example.invalid/api/v1/executions/{{ $json.execution_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "includeData",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        80,
+        -48
+      ],
+      "id": "0f724be2-1136-47ce-baf5-9409a0cb4cff",
+      "name": "Get Failed Execution"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract Execution Evidence — Panoptes M4\n\nconst execution = $input.first().json;\n\n// Preserve the original Panoptes request because HTTP Request replaces the input\nconst request = $('Validate Evidence Request').first().json;\n\nconst resultData = execution.data?.resultData ?? {};\nconst error = resultData.error ?? execution.error ?? null;\n\nconst executionStatus = execution.status ?? null;\n\n// Only treat a node as failed when the execution actually failed\nconst failedNode =\n  executionStatus === 'error'\n    ? (\n        error?.node?.name ??\n        resultData.lastNodeExecuted ??\n        null\n      )\n    : null;\n\nconst runData = resultData.runData ?? {};\n\nconst failedNodeRuns =\n  failedNode && runData[failedNode]\n    ? runData[failedNode]\n    : [];\n\nreturn [\n  {\n    json: {\n      incident_id: request.incident_id,\n\n      requested_workflow_id: request.workflow_id,\n      execution_id: execution.id ? String(execution.id) : null,\n      workflow_id: execution.workflowId\n        ? String(execution.workflowId)\n        : null,\n\n      execution_status: executionStatus,\n      execution_mode: execution.mode ?? null,\n\n      started_at: execution.startedAt ?? null,\n      stopped_at: execution.stoppedAt ?? null,\n\n      failed_node: failedNode,\n\n      error: {\n        name: error?.name ?? null,\n        message: error?.message ?? null,\n        description: error?.description ?? null,\n        http_status:\n          error?.httpCode ??\n          error?.statusCode ??\n          error?.context?.httpCode ??\n          null,\n      },\n\n      failed_node_runs: failedNodeRuns,\n\n      retry_of: execution.retryOf ?? null,\n      retry_success_id: execution.retrySuccessId ?? null,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -48
+      ],
+      "id": "f750c9e2-26ff-47f0-b8bd-432271e990cf",
+      "name": "Extract Execution Evidence"
+    },
+    {
+      "parameters": {
+        "url": "=https://n8n.example.invalid/api/v1/workflows/{{ $('Validate Evidence Request').first().json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        528,
+        -48
+      ],
+      "id": "ccae8125-35af-4e24-9948-0eb97512cf22",
+      "name": "Get Workflow Metadata"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract Workflow Metadata — Panoptes M4\n\nconst workflow = $input.first().json;\n\nreturn [\n  {\n    json: {\n      workflow_id: workflow.id ?? null,\n      workflow_name: workflow.name ?? null,\n      active: workflow.active ?? false,\n      archived: workflow.isArchived ?? false,\n      version_id: workflow.versionId ?? null,\n      updated_at: workflow.updatedAt ?? null,\n\n      error_workflow_id: workflow.settings?.errorWorkflow ?? null,\n\n      nodes: Array.isArray(workflow.nodes)\n        ? workflow.nodes.map(node => ({\n            name: node.name ?? null,\n            type: node.type ?? null,\n          }))\n        : [],\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -48
+      ],
+      "id": "760bfca5-f218-4b89-a465-6319c150cace",
+      "name": "Extract Workflow Metadata"
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.example.invalid/api/v1/executions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "workflowId",
+              "value": "={{ $('Validate Evidence Request').first().json.workflow_id }}"
+            },
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            },
+            {
+              "name": "includeData",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        992,
+        -48
+      ],
+      "id": "237a01ca-098b-4f10-b41f-90f20c277f26",
+      "name": "Get Recent Successful Executions"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Select Previous Successful Execution — Panoptes M4\n\nconst response = $input.first().json;\nconst failedExecutionId =\n  Number($('Validate Evidence Request').first().json.execution_id);\n\nconst executions = Array.isArray(response.data)\n  ? response.data\n  : [];\n\nconst previous = executions\n  .filter(exec => Number(exec.id) < failedExecutionId)\n  .sort((a, b) => Number(b.id) - Number(a.id))[0] ?? null;\n\nreturn [\n  {\n    json: {\n      found: Boolean(previous),\n\n      execution_id: previous?.id\n        ? String(previous.id)\n        : null,\n\n      status: previous?.status ?? null,\n      mode: previous?.mode ?? null,\n      started_at: previous?.startedAt ?? null,\n      stopped_at: previous?.stoppedAt ?? null,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -48
+      ],
+      "id": "61655b57-6d85-407a-ae77-542662f67f87",
+      "name": "Select Previous Success"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Evidence Bundle — Panoptes M4\n\nconst request = $('Validate Evidence Request').first().json;\nconst execution = $('Extract Execution Evidence').first().json;\nconst workflow = $('Extract Workflow Metadata').first().json;\nconst previousSuccess = $('Select Previous Success').first().json;\n\n// Keep only useful failed-node evidence.\n// Do not forward giant stack traces/raw execution dumps to the future AI agent.\nconst failedRun =\n  Array.isArray(execution.failed_node_runs) &&\n  execution.failed_node_runs.length > 0\n    ? execution.failed_node_runs[0]\n    : null;\n\nconst failedNodeRunSummary = failedRun\n  ? {\n      execution_status: failedRun.executionStatus ?? null,\n      execution_time_ms: failedRun.executionTime ?? null,\n\n      source: Array.isArray(failedRun.source)\n        ? failedRun.source.map(source => ({\n            previous_node: source.previousNode ?? null,\n            previous_node_output: source.previousNodeOutput ?? null,\n            previous_node_run: source.previousNodeRun ?? null,\n          }))\n        : [],\n\n      error_name: failedRun.error?.name ?? null,\n      error_message: failedRun.error?.message ?? null,\n    }\n  : null;\n\nconst evidenceBundle = {\n  incident_id: request.incident_id,\n\n  collected_at: new Date().toISOString(),\n\n  failed_execution: {\n    execution_id: execution.execution_id,\n    workflow_id: execution.workflow_id,\n    status: execution.execution_status,\n    mode: execution.execution_mode,\n\n    started_at: execution.started_at,\n    stopped_at: execution.stopped_at,\n\n    failed_node: execution.failed_node,\n\n    error: execution.error,\n\n    failed_node_run: failedNodeRunSummary,\n\n    retry_of: execution.retry_of,\n    retry_success_id: execution.retry_success_id,\n  },\n\n  workflow: {\n    workflow_id: workflow.workflow_id,\n    workflow_name: workflow.workflow_name,\n    active: workflow.active,\n    archived: workflow.archived,\n    version_id: workflow.version_id,\n    updated_at: workflow.updated_at,\n    error_workflow_id: workflow.error_workflow_id,\n    nodes: workflow.nodes,\n  },\n\n  previous_success: {\n    found: previousSuccess.found,\n    execution_id: previousSuccess.execution_id,\n    status: previousSuccess.status,\n    mode: previousSuccess.mode,\n    started_at: previousSuccess.started_at,\n    stopped_at: previousSuccess.stopped_at,\n  },\n\n  integrity: {\n    requested_workflow_id: request.workflow_id,\n\n    workflow_id_matches:\n      String(request.workflow_id) === String(execution.workflow_id),\n\n    metadata_workflow_id_matches:\n      String(request.workflow_id) === String(workflow.workflow_id),\n\n    execution_id_matches:\n      String(request.execution_id) === String(execution.execution_id),\n  },\n};\n\nreturn [\n  {\n    json: evidenceBundle,\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -48
+      ],
+      "id": "5ffa5603-bf6f-4689-aab6-eea8bc41bd45",
+      "name": "Build Evidence Bundle"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Evidence Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Evidence Request": {
+      "main": [
+        [
+          {
+            "node": "Get Failed Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Failed Execution": {
+      "main": [
+        [
+          {
+            "node": "Extract Execution Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Execution Evidence": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow Metadata": {
+      "main": [
+        [
+          {
+            "node": "Extract Workflow Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Workflow Metadata": {
+      "main": [
+        [
+          {
+            "node": "Get Recent Successful Executions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Successful Executions": {
+      "main": [
+        [
+          {
+            "node": "Select Previous Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Previous Success": {
+      "main": [
+        [
+          {
+            "node": "Build Evidence Bundle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}
