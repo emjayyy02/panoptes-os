@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ThemeControl } from './ThemeControl'
 import styles from './ConsoleShell.module.css'
 export function ConsoleShell({ children }: { children: ReactNode }) {
   return <>
@@ -8,7 +9,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         <svg aria-hidden="true" viewBox="0 0 32 32" className={styles.mark}><path d="M3 16 10 6h12l7 10-7 10H10Z" fill="none" stroke="currentColor" strokeWidth="1.5"/><circle cx="16" cy="16" r="5" fill="none" stroke="currentColor" strokeWidth="1.5"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/></svg>
         <div><div className={styles.name}>PANOPTES <span>OS</span></div><p>Incident Operations Console</p></div>
       </div>
-      <p className={styles.tagline}>Observe <span>·</span> Diagnose <span>·</span> Govern <span>·</span> Recover</p>
+      <div className={styles.headerTools}><p className={styles.tagline}>Observe <span>·</span> Diagnose <span>·</span> Govern <span>·</span> Recover</p><ThemeControl /></div>
     </header>
     <main id="main" tabIndex={-1} className={styles.main}>{children}</main>
     <footer className={styles.footer}><span>Panoptes OS · Operator Console</span><span>AI recommends. Deterministic policy governs recovery.</span></footer>

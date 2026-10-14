@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ApprovalDecision, IncidentDetail } from '../../types/panoptes'
 import type { useApprovalAction } from '../../hooks/useApprovalAction'
 import { provided } from '../../utils/incidentPresentation'
+import { StatusBadge } from '../shared/StatusBadge'
 import styles from './IncidentDetail.module.css'
 
 export interface DecisionDraft { incident: IncidentDetail; decision: ApprovalDecision; revision: number }
@@ -37,7 +38,6 @@ export function OperatorConfirmationDialog({ draft, action, onCancel, onConfirm 
     if (!event.shiftKey && document.activeElement === confirm.current) { event.preventDefault(); cancel.current?.focus() }
   }}>
     <div className={styles.confirmationContent}>
-      <p className={styles.eyebrow}>OPERATOR CONFIRMATION</p>
       <h2 id="confirmation-title">{draft?.decision === 'REJECT' ? 'Reject recovery?' : 'Approve recovery?'}</h2>
       <p id="confirmation-description" className={styles.prose}>{draft?.decision === 'REJECT' ? 'Send a rejection to Panoptes. The backend records the decision and determines the resulting incident state.' : 'Send approval to Panoptes to continue the proposed recovery. The backend still governs recovery and its outcome.'}</p>
       {incident && <>
@@ -45,7 +45,7 @@ export function OperatorConfirmationDialog({ draft, action, onCancel, onConfirm 
         <dl className={styles.facts}>
           <div><dt>Proposed action</dt><dd>{provided(incident.recovery.proposed_action)}</dd></div>
           <div><dt>Retries / budget</dt><dd>{incident.recovery.retry_count} / {incident.recovery.max_retries}</dd></div>
-          <div><dt>Retry safety</dt><dd>{incident.diagnosis.retry_safety}</dd></div>
+          <div><dt>Retry safety</dt><dd><StatusBadge value={incident.diagnosis.retry_safety} /></dd></div>
           <div><dt>Side-effect risk</dt><dd>{incident.diagnosis.side_effect_risk}</dd></div>
           <div><dt>Idempotency guaranteed</dt><dd>{incident.config.idempotency_guaranteed ? 'Yes' : 'No'}</dd></div>
         </dl>

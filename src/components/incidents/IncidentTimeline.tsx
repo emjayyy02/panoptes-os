@@ -1,16 +1,19 @@
 import type { IncidentEvent } from '../../types/panoptes'
 import { label, number, timestamp } from '../../utils/formatters'
 import { provided } from '../../utils/incidentPresentation'
+import { UiIcon } from '../shared/UiIcon'
+import type { IconName } from '../shared/UiIcon'
 import styles from './IncidentDetail.module.css'
 
-const emphasis: Record<string, string> = { APPROVAL_REQUESTED: 'warning', APPROVAL_GRANTED: 'success', APPROVAL_REJECTED: 'warning', INCIDENT_RECOVERED: 'success', INCIDENT_ESCALATED: 'danger', RETRY_FAILED: 'danger', RETRY_EXHAUSTED: 'danger' }
+const emphasis: Record<string, IconName> = { APPROVAL_REQUESTED: 'warning', APPROVAL_GRANTED: 'success', APPROVAL_REJECTED: 'warning', INCIDENT_RECOVERED: 'success', INCIDENT_ESCALATED: 'critical', RETRY_FAILED: 'critical', RETRY_EXHAUSTED: 'critical', RECOVERY_ATTEMPTED: 'info' }
+const eventTone = (type: string): IconName => Object.hasOwn(emphasis, type) ? emphasis[type] : 'neutral'
 export function IncidentTimeline({ events }: { events: IncidentEvent[] }) {
   return <section className={styles.section} aria-labelledby="timeline-title">
     <h3 id="timeline-title">Event timeline <span className={styles.sectionNote}>{number(events.length)} events</span></h3>
     <p className={styles.caption}>Chronological history in the order supplied by Panoptes.</p>
     {!events.length ? <p className={styles.prose}>No events returned for this incident.</p> : <ol className={styles.timeline}>
       {events.map((event, index) => <li key={`${event.event_id}:${index}`} data-event-id={event.event_id}>
-        <div className={`${styles.eventMarker} ${styles[emphasis[event.type] ?? 'neutral'] ?? ''}`} aria-hidden="true" />
+        <div className={`${styles.eventMarker} ${styles[eventTone(event.type)]}`} aria-hidden="true"><UiIcon name={eventTone(event.type)} /></div>
         <div className={styles.eventContent}>
           <p className={styles.eventType} title={event.type}>{label(event.type)}</p>
           <time dateTime={event.timestamp} title={event.timestamp} className={styles.eventTime}>{timestamp(event.timestamp, true)}</time>

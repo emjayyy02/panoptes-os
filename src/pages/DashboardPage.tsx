@@ -4,7 +4,7 @@ import { SummaryMetrics } from '../components/dashboard/SummaryMetrics'
 import { FailureDistribution } from '../components/dashboard/FailureDistribution'
 import { RecentIncidentsTable } from '../components/dashboard/RecentIncidentsTable'
 import { DataState, RefreshWarning } from '../components/shared/DataState'
-import { number, operatorTimeZone, timestamp } from '../utils/formatters'
+import { number, timestamp } from '../utils/formatters'
 import styles from './DashboardPage.module.css'
 import { isAwaitingDecision } from '../utils/incidentPresentation'
 
@@ -17,12 +17,12 @@ export function DashboardPage({ dashboard, onIncidentOpen }: { dashboard: Return
   const connection = refreshing ? 'Refreshing API data' : hasError ? 'API data incomplete' : bothLoaded ? 'API data loaded' : 'Waiting for API data'
   return <>
     <div className={styles.heading}>
-      <div><p className={styles.eyebrow}>OPERATIONS / OVERVIEW</p><h1>Incident overview</h1><p className={styles.description}>Recovery states, safety signals, and incidents requiring attention.</p></div>
+      <div><h1>Incident overview</h1><p className={styles.description}>Recovery states, safety signals, and incidents requiring attention.</p></div>
       <button className={styles.refresh} onClick={refresh} disabled={refreshing}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 7A6.5 6.5 0 1 0 16 13M16 3v4h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{refreshing ? 'Refreshing…' : 'Refresh data'}
       </button>
     </div>
-    <div className={styles.context}><p role="status" aria-live="polite"><span className={`${styles.dot} ${hasError ? styles.errorDot : bothLoaded && !refreshing ? styles.loadedDot : ''}`} aria-hidden="true" />{connection}</p><span>Manual refresh <span className={styles.separator}>/</span> Times in {operatorTimeZone}</span></div>
+    <div className={styles.context}><p role="status" aria-live="polite"><span className={`${styles.dot} ${hasError ? styles.errorDot : bothLoaded && !refreshing ? styles.loadedDot : ''}`} aria-hidden="true" />{connection}</p><span>Manual refresh <span className={styles.separator}>/</span> Local time</span></div>
     <section className={styles.panel} aria-label="Incident summary" aria-busy={summary.loading}>
       {summary.data ? <>{summary.error && <RefreshWarning error={summary.error} />}<SummaryMetrics summary={summary.data} /><p className={styles.summaryTime}>Summary generated <time dateTime={summary.data.generated_at}>{timestamp(summary.data.generated_at, true)}</time> · Metrics may overlap.</p></>
         : <DataState kind={summary.loading ? 'loading' : 'error'} title={summary.loading ? 'Loading incident summary' : 'Summary unavailable'} message={summary.error ?? 'Requesting current counts from Panoptes.'} />}

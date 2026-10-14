@@ -8,7 +8,7 @@ import { IncidentEvidence } from './IncidentEvidence'
 import { RecoveryDetails } from './RecoveryDetails'
 import { IncidentTimeline } from './IncidentTimeline'
 import { OperatorDecisionControls } from './OperatorDecisionControls'
-import { timestamp } from '../../utils/formatters'
+import { label, timestamp } from '../../utils/formatters'
 import styles from './IncidentDetail.module.css'
 
 export function IncidentDetailPanel({ selectedId, detail, action, onClose, onDecision }: {
@@ -32,7 +32,7 @@ export function IncidentDetailPanel({ selectedId, detail, action, onClose, onDec
   }, [selectedId])
   return <dialog ref={dialog} className={styles.panel} aria-labelledby="incident-panel-title" onCancel={event => { event.preventDefault(); if (!action.busy) onClose() }}>
     <header className={styles.header}>
-      <div className={styles.headerIdentity}><p className={styles.eyebrow}>INCIDENT EXPLORER</p><h2 id="incident-panel-title" ref={heading} tabIndex={-1}>Incident detail</h2><p className={styles.incidentId}>{selectedId}</p></div>
+      <div className={styles.headerIdentity}><h2 id="incident-panel-title" ref={heading} tabIndex={-1}>Incident detail</h2></div>
       <button className={styles.button} disabled={action.busy} onClick={onClose} aria-label="Close incident detail">Close</button>
     </header>
     <div className={styles.toolbar}>
@@ -41,11 +41,11 @@ export function IncidentDetailPanel({ selectedId, detail, action, onClose, onDec
       <button className={styles.button} disabled={!selectedId || detail.loading || action.busy} onClick={detail.refresh}>Refresh incident</button>
     </div>
     <div ref={body} className={styles.panelBody} aria-busy={detail.loading}>
+      <div className={styles.identitySummary}>{detail.data && <><p className={styles.headerWorkflow}>{detail.data.incident.workflow.name ?? 'Workflow name unavailable'}</p><p className={styles.failureType}>Failure type: {label(detail.data.incident.diagnosis.failure_type)}</p></>}<p className={styles.incidentId}>{selectedId}</p></div>
       {detail.data ? <>
         {detail.error && <RefreshWarning error={detail.error} />}
         <IncidentEvidence incident={detail.data.incident} />
-        <RecoveryDetails incident={detail.data.incident} />
-        <OperatorDecisionControls incident={detail.data.incident} fresh={!detail.loading && !detail.error} action={action} onDecision={onDecision} />
+        <RecoveryDetails incident={detail.data.incident} decisionControls={<OperatorDecisionControls incident={detail.data.incident} fresh={!detail.loading && !detail.error} action={action} onDecision={onDecision} />} />
         <IncidentTimeline events={detail.data.timeline} />
       </> : <DataState kind={detail.loading ? 'loading' : 'error'} title={detail.loading ? 'Loading incident detail' : detail.notFound ? 'Incident not found' : 'Incident detail unavailable'} message={detail.error ?? 'Requesting live evidence and event history from Panoptes.'} />}
     </div>

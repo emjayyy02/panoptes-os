@@ -1,6 +1,8 @@
-.badge { display: inline-block; max-width: 100%; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px; font: 10px/1.5 var(--mono); letter-spacing: .025em; overflow-wrap: anywhere; }
-.danger { color: var(--danger); background: #f19d9420; border-color: #f19d9430; }
-.warning { color: var(--warning); background: #e8c17c18; border-color: #e8c17c30; }
-.success { color: var(--success); background: #88ceb01a; border-color: #88ceb030; }
-.active { color: var(--accent); background: #a2c3e518; border-color: #a2c3e530; }
-.neutral { color: var(--muted); background: var(--surface-raised); border-color: var(--border); }
+.badge { display: inline-flex; align-items: center; gap: var(--space-1); max-width: 100%; border: 1px solid; border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); font-size: 12px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.badge svg { width: 14px; height: 14px; flex-shrink: 0; }
+.badge > span { min-width: 0; }
+.critical { color: var(--status-critical); background: var(--status-critical-bg); border-color: var(--status-critical-border); }
+.warning { color: var(--status-warning); background: var(--status-warning-bg); border-color: var(--status-warning-border); }
+.success { color: var(--status-success); background: var(--status-success-bg); border-color: var(--status-success-border); }
+.info { color: var(--status-info); background: var(--status-info-bg); border-color: var(--status-info-border); }
+.neutral { color: var(--status-neutral); background: var(--status-neutral-bg); border-color: var(--status-neutral-border); }
